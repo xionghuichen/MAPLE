@@ -12,10 +12,10 @@ import numpy as np
 from tqdm import trange
 from scipy.io import savemat, loadmat
 
-from mopo.models.utils import get_required_argument, TensorStandardScaler
-from mopo.models.fc import FC
+from maple.models.utils import get_required_argument, TensorStandardScaler
+from maple.models.fc import FC
 
-from mopo.utils.logging import Progress, Silent
+from maple.utils.logging import Progress, Silent
 from RLA.easy_log import logger
 from RLA.easy_log.tester import tester
 np.set_printoptions(precision=5)
@@ -44,8 +44,6 @@ class BNN:
         self.name = get_required_argument(params, 'name', 'Must provide name.')
         self.model_dir = params.get('model_dir', None)
         self.obs_dim = params.get('obs_dim', None)
-        self.res_dyn = params.get("res_dyn", None)
-        self.norm_input = params.get("norm_input", None)
         self.source = params.get("source", None)
         print('[ BNN ] Initializing model: {} | {} networks | {} elites'.format(params['name'], params['num_networks'], params['num_elites']))
         if params.get('sess', None) is None:
@@ -668,24 +666,12 @@ class BNN:
             logvar = self.max_logvar - tf.nn.softplus(self.max_logvar - cur_out[:, :, dim_output//2:])
             logvar = self.min_logvar + tf.nn.softplus(logvar - self.min_logvar)
         else:
-            if self.norm_input:
-               cur_out = self.scaler.transform(inputs)
-            else:
-                cur_out = inputs
-            mean = cur_out
+            mean = self.scaler.transform(inputs)
             means = [mean]
             # logvar = cur_out
             for layer in self.layers:
                 mean = layer.compute_output_tensor(mean)
                 means.append(mean)
-            # assume two-head architecture
-            # print("obs dim", self.obs_dim)
-            if self.res_dyn:
-                mean_obs = mean[..., :self.obs_dim]
-                mean_rew = mean[..., self.obs_dim:]
-                mean_obs = mean_obs + inputs[..., :self.obs_dim]
-                mean = tf.concat([mean_obs, mean_rew], axis=-1)
-                means[-1] = mean
             logvar = means[-2]
             for layer in self.var_layers:
                 logvar = layer.compute_output_tensor(logvar)

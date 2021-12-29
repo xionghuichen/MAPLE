@@ -47,8 +47,8 @@ def get_package_path():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALGORITHM_PARAMS_ADDITIONAL = {
-    'MOPO': {
-        'type': 'MOPO',
+    'MAPLE': {
+        'type': 'MAPLE',
         'kwargs': {
             'reparameterize': REPARAMETERIZE,
             'lr': 3e-4,
@@ -114,10 +114,10 @@ NUM_EPOCHS_PER_DOMAIN = {
     'Hopper': int(1e3),
     'HalfCheetah': int(1e3),
     'HalfCheetahJump': int(3e3),
-    'HalfCheetahVel': int(500),#int(3e3),
+    'HalfCheetahVel': int(500),
     'HalfCheetahVelJump': int(3e3),
     'Walker2d': int(1e3),
-    'Ant': int(1000),#int(500),#int(3e3),
+    'Ant': int(1000),
     'AntAngle': int(3e3),
     'Humanoid': int(1e4),
     'Pusher2d': int(2e3),
@@ -135,12 +135,9 @@ ALGORITHM_PARAMS_PER_DOMAIN = {
     **{
         domain: {
             'kwargs': {
-                'n_epochs': NUM_EPOCHS_PER_DOMAIN.get(
-                    domain, DEFAULT_NUM_EPOCHS),
+                'n_epochs': NUM_EPOCHS_PER_DOMAIN.get(domain, DEFAULT_NUM_EPOCHS),
                 'n_initial_exploration_steps': (
-                    MAX_PATH_LENGTH_PER_DOMAIN.get(
-                        domain, DEFAULT_MAX_PATH_LENGTH
-                    ) * 10),
+                    MAX_PATH_LENGTH_PER_DOMAIN.get(domain, DEFAULT_MAX_PATH_LENGTH) * 10),
             }
         } for domain in NUM_EPOCHS_PER_DOMAIN
     }
@@ -307,3 +304,87 @@ def get_variant_spec(args, env_params):
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (args.checkpoint_replay_pool)
     return variant_spec
+
+NEORL_CONFIG = {
+    "hopper":
+        {
+            'common': {
+                'length': 10,
+                'penalty_coeff': 1.0,
+            },
+        },
+    "halfcheetah":
+        {
+            'commen': {
+                'length': 15,
+                'penalty_coeff': 1.0,
+            }
+        },
+    'walker2d':
+        {
+            'common': {
+                'length': 15,
+                'penalty_coeff': 0.25,
+            }
+        }
+}
+D4RL_MAPLE_CONFIG = {
+    'common':{
+        'length': 10,
+        'penalty_coeff': 0.25,
+    },
+    'halfcheetah':{
+        'common': {},
+        'med_expert':
+            {
+                'penalty_coeff': 4.0,
+            }
+    }
+}
+
+D4RL_MAPLE_200_CONFIG = {
+    'common': {
+        'length': 20,
+        'penalty_coeff': 0.25,
+    },
+    'halfcheetah': {
+        'common': {},
+        'med_expert':
+            {
+                'length': 10,
+                'penalty_coeff': 4.0,
+            }
+    },
+    'hopper': {
+        'common': {
+            'penalty_coeff': 1.0,
+        }
+    },
+}
+def get_task_spec(variant_spec):
+    if variant_spec["custom_config"]:
+        return variant_spec
+    else:
+        # variant_spec['model_suffix'] = command_line_args.model_suffix
+        # variant_spec['emb_size'] = command_line_args.emb_size
+        # variant_spec['length'] = command_line_args.length
+        # variant_spec['penalty_coeff'] = command_line_args.penalty_coeff
+        # variant_spec['elite_num'] = command_line_args.elite_num
+        if variant_spec['environment_params']['training']['kwargs']['use_neorl']:
+            if variant_spec['maple_200']:
+                assert "have not test maple_200 in neorl yet"
+            variant_spec['model_suffix'] = 50
+            tasks = variant_spec['config'].split('.')[-1].split('_')
+            variant_spec.update(NEORL_CONFIG[tasks[0]]['common'])
+        else:
+            tasks = variant_spec['config'].split('.')[-1].split('_')
+            if variant_spec['maple_200']:
+                variant_spec['model_suffix'] = 200
+            else:
+                variant_spec['model_suffix'] = 20
+                variant_spec.update(D4RL_MAPLE_CONFIG['common'])
+                if tasks[0] in D4RL_MAPLE_CONFIG.keys():
+                    variant_spec.update(D4RL_MAPLE_CONFIG[tasks[0]]['common'])
+                    if tasks[1] in D4RL_MAPLE_CONFIG[tasks[0]].keys():
+                        variant_spec.update(D4RL_MAPLE_CONFIG[tasks[0]][tasks[1]])
+        return variant_spec

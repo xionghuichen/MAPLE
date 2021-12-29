@@ -1,6 +1,6 @@
-from .base_mopo import mopo_params, deepcopy
+from .base_maple import maple_params, deepcopy
 
-params = deepcopy(mopo_params)
+params = deepcopy(maple_params)
 params.update({
     'domain': 'Hopper',
     'task': 'v3',

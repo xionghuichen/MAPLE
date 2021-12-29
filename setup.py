@@ -15,7 +15,6 @@ setup(
             'viskit=mopo.scripts.console_scripts:main'
         )
     },
-    requires=(),
     install_requires=[
         "RLA>=0.3",
     ],

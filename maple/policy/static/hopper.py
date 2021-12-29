@@ -1,5 +1,5 @@
 import numpy as np
-
+from maple.global_config import *
 class StaticFns:
 
     @staticmethod
@@ -12,7 +12,7 @@ class StaticFns:
         # not_done =  np.logical_and(np.all(next_obs > -100, axis=-1),
         #                np.all(next_obs < 100, axis=-1)) * \
         not_done = np.isfinite(next_obs).all(axis=-1) \
-                    * np.abs(next_obs[:,1:] < 100).all(axis=-1) \
+                    * np.abs(next_obs < STATE_CLIP_BOUND).all(axis=-1) \
                     * (height > .7) \
                     * (np.abs(angle) < .2)
 

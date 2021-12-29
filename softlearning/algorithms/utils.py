@@ -43,7 +43,7 @@ def get_algorithm_from_variant(variant,  *args, **kwargs):
     algorithm_type = algorithm_params['type']
     algorithm_kwargs = deepcopy(algorithm_params['kwargs'])
     exp_name = variant['algorithm_params']["exp_name"]
-    vae = variant['use_vae']
+    # vae = variant['use_vae']
     retrain_model = variant['retrain_model']
     exp_name = exp_name.replace('_', '-')
     if algorithm_kwargs['separate_mean_var']:

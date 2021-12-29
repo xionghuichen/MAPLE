@@ -1,5 +1,5 @@
 params = {
-    'type': 'MOPO',
+    'type': 'MAPLE',
     'universe': 'gym',
     'domain': 'Hopper',
     'task': 'v2',

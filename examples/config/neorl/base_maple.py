@@ -1,6 +1,6 @@
 from copy import deepcopy
 base_params = {
-    'type': 'MOPO',
+    'type': 'MAPLE',
     'universe': 'gym',
 
     'log_dir': './ray_mopo/', # Specify where to write log files here
@@ -29,8 +29,8 @@ base_params = {
     }
 }
 
-mopo_params = deepcopy(base_params)
-mopo_params['kwargs'].update({
+maple_params = deepcopy(base_params)
+maple_params['kwargs'].update({
     'separate_mean_var': True,
     'penalty_learned_var': True,
 })

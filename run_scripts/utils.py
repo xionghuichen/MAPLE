@@ -13,7 +13,11 @@ from softlearning.misc.utils import datetimestamp
 DEFAULT_UNIVERSE = 'gym'
 DEFAULT_DOMAIN = 'HalfCheetah'
 DEFAULT_TASK = 'v2'
-DEFAULT_ALGORITHM = 'MOPO'
+
+class AlgType(object):
+    MAPLE_NEORL = 'maple_neorl'
+    MAPLE_D4RL = 'maple_d4rl'
+    MAPLE_D4RL_200 = 'maple_d4rl_200'
 
 
 TASKS_BY_DOMAIN_BY_UNIVERSE = {
@@ -238,8 +242,7 @@ def get_parser(allow_policy_list=False):
         '--info', type=str, default='default_info')
     parser.add_argument(
         '--length', type=int, default=-1)
-    parser.add_argument(
-        '--elite_num', type=int, default=-1)
+    parser.add_argument('--elite_num', type=int, default=-1)
     parser.add_argument( '--seed', type=int, default=88)
     parser.add_argument( '--n_epochs', type=int, default=1000)
     parser.add_argument(
@@ -250,16 +253,11 @@ def get_parser(allow_policy_list=False):
         '--model_suffix', type=str, default='0')
     parser.add_argument(
         '--load_date', type=str, default='')
-    parser.add_argument(
-        '--load_task_name', type=str, default='')
+    parser.add_argument('--load_task_name', type=str, default='')
     parser.add_argument('--not_inherit_hp', action='store_false')
-    parser.add_argument('--use_vae', action='store_true')
+    parser.add_argument('--maple_200', action='store_true')
     parser.add_argument('--custom_config', action='store_true')
-    parser.add_argument('--fix_env', action='store_true')
-    parser.add_argument('--no_clip_state', action='store_true')
     parser.add_argument('--retrain_model', action='store_true')
-    parser.add_argument('--res_dyn', action='store_true')
-    parser.add_argument('--no_norm_input', action='store_true')
     parser.add_argument(
         '--checkpoint-replay-pool',
         type=lambda x: bool(strtobool(x)),
@@ -271,11 +269,6 @@ def get_parser(allow_policy_list=False):
               " constructed) piece by piece so that each"
               " experience is saved only once."))
 
-    # parser.add_argument(
-    #     '--algorithm',
-    #     type=str,
-    #     choices=AVAILABLE_ALGORITHMS,
-    #     default=DEFAULT_ALGORITHM)
     if allow_policy_list:
         parser.add_argument(
             '--policy',

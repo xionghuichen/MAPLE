@@ -17,18 +17,15 @@ from tensorflow.python.training import training_util
 from softlearning.algorithms.rl_algorithm import RLAlgorithm
 from softlearning.replay_pools.simple_replay_pool import SimpleReplayPool, SimpleReplayTrajPool
 
-from mopo.models.constructor import construct_model, format_samples_for_training
-from mopo.models.fake_env import FakeEnv
-from mopo.utils.writer import Writer
-from mopo.utils.visualization import visualize_policy
-from mopo.utils.logging import Progress
-import mopo.utils.filesystem as filesystem
-import mopo.off_policy.loader as loader
+from maple.models.constructor import construct_model, format_samples_for_training
+from maple.policy.fake_env import FakeEnv
+from maple.utils.logging import Progress
+import maple.utils.filesystem as filesystem
+import maple.dataset.loader as loader
 from RLA.easy_log.tester import tester
 from RLA.easy_log import logger
 from d4rl import infos
-import tensorflow.contrib.distributions as tfd
-
+from maple.global_config import *
 
 def td_target(reward, discount, next_value):
     return reward + discount * next_value
@@ -37,7 +34,7 @@ def get_vars(scope):
     return [x for x in tf.global_variables() if scope in x.name]
 
 
-class MOPO(RLAlgorithm):
+class MAPLE(RLAlgorithm):
     """Model-based Offline Policy Optimization (MOPO)
 
     References
@@ -69,7 +66,6 @@ class MOPO(RLAlgorithm):
             network_kwargs=None,
             deterministic=False,
             rollout_random=False,
-            fix_env=False,
             model_train_freq=250,
             num_networks=7,
             num_elites=5,
@@ -92,7 +88,6 @@ class MOPO(RLAlgorithm):
             model_load_dir=None,
             penalty_coeff=0.,
             penalty_learned_var=False,
-            tester=None,
             seed=0,
             source=None,
             el=None,
@@ -119,12 +114,10 @@ class MOPO(RLAlgorithm):
                 a likelihood ratio based estimator otherwise.
         """
 
-        super(MOPO, self).__init__(**kwargs)
-        # self.sampler._batch_size = 2560
+        super(MAPLE, self).__init__(**kwargs)
         print("\n\n[ DEBUG ]: model name: {}, penalty coeff: {}, elite num: {}, model_num: {}, rollout_length: {}, policy batch_size: {}\n\n".format(model_name, penalty_coeff, num_elites,
                                                                                                                                                      num_networks, rollout_length, self.sampler._batch_size))
 
-        self.tester = tester
 
         self.res_dyn = res_dyn
         self.norm_input = norm_input
@@ -133,9 +126,11 @@ class MOPO(RLAlgorithm):
             self._env_name = model_name[:-(7+final_len)] + '-v0'
         else:
             self._env_name = model_name[:-(3+final_len)] + '-v0'
+        self.num_networks = num_networks
         model_name = self._env_name + ('_smv' if separate_mean_var else '') + '_{}_{}'.format(seed, num_networks)
         # name_prefix = ''.format(name_prefix)
-        model_name = self._env_name + ('_smv' if separate_mean_var else '') + '_{}_{}_norm_{}_res_{}'.format(seed, num_networks, self.norm_input, self.res_dyn)
+        # model_name = self._env_name + ('_smv' if separate_mean_var else '') + '_{}_{}_norm_{}_res_{}'.format(seed, num_networks, self.norm_input, self.res_dyn)
+        self.model_name = model_name
         self._model_load_dir = model_load_dir
         if retrain:
             model_load_dir = None
@@ -165,16 +160,7 @@ class MOPO(RLAlgorithm):
                                       norm_input=self.norm_input, res_dyn=self.res_dyn, source=source)
         print('[ MOPO ]: got self._model')
         self._static_fns = static_fns
-        self.max_penalty = 20.0
-        if self.source == 'd4rl':
-            if self._env_name == 'halfcheetah-medium-expert-v0' or self._env_name == 'hopper-medium_expert-v0':
-                self.max_penalty = 4.0
-            pass
-        elif self.source == 'neorl':
-            pass
-            # if self._env_name == 'halfcheetah-low':
-            #     self.max_penalty = 4.0
-        #
+        self.max_penalty = MAX_PENALTY
         self.fake_env = FakeEnv(self._model, self._static_fns, penalty_coeff=penalty_coeff,
                                 penalty_learned_var=penalty_learned_var, max_penalty=self.max_penalty)
 
@@ -190,23 +176,12 @@ class MOPO(RLAlgorithm):
         self._deterministic = deterministic
         self._rollout_random = rollout_random
         self._real_ratio = real_ratio
-        # TODO: RLA writer (implemented with tf) should be compatible with the Writer object (implemented with tbx)
         self._log_dir = os.path.join(tester.log_dir)
-        # self._writer = tester.writer
-        self._writer = Writer(self._log_dir)
 
         self._training_environment = training_environment
         self._evaluation_environment = evaluation_environment
         self.gru_state_dim = network_kwargs['lstm_hidden_unit']
         self.network_kwargs = network_kwargs
-        self.vae = vae
-        self.optim_alpha = False
-        self.fix_env = fix_env
-        # self._policy = policy
-
-        # self._Qs = Qs
-        # self._Q_targets = tuple(tf.keras.models.clone_model(Q) for Q in Qs)
-
         observation_shape = self._training_environment.active_observation_shape
         action_shape = self._training_environment.action_space.shape
         self._pool = pool
@@ -234,8 +209,6 @@ class MOPO(RLAlgorithm):
 
         self._reparameterize = reparameterize
         self._store_extra_policy_info = store_extra_policy_info
-
-
         assert len(observation_shape) == 1, observation_shape
         self._observation_shape = observation_shape
         assert len(action_shape) == 1, action_shape
@@ -253,6 +226,7 @@ class MOPO(RLAlgorithm):
                             policy_hook=get_hidden, fake_env=self.fake_env)
 
         total_samples = self._pool.return_all_samples()
+        self.total_samples = total_samples
         self.min_rewards = np.min(total_samples['rewards']) - self.max_penalty * penalty_coeff
         self.max_raw_rew = self.max_rewards = np.max(total_samples['rewards'])
         self.min_raw_rew = np.min(total_samples['rewards'])
@@ -262,13 +236,13 @@ class MOPO(RLAlgorithm):
         soft_expanding = expert_range * 0.05
         self.max_state += soft_expanding
         self.min_state -= soft_expanding
-        self.min_state = np.minimum(self.min_state, -100)
-        self.max_state = np.maximum(self.max_state, 100)
+        self.min_state = np.minimum(self.min_state, -1 * STATE_CLIP_BOUND)
+        self.max_state = np.maximum(self.max_state, STATE_CLIP_BOUND)
         self.shift = self.min_state
         self.scale = self.max_state - self.min_state
         self.scale[self.scale == 0] = 1.
         self._env_pool = SimpleReplayTrajPool(
-            training_environment.observation_space, training_environment.action_space, self.fix_rollout_length,
+            self._training_environment.observation_space, self._training_environment.action_space, self.fix_rollout_length,
             self.network_kwargs["lstm_hidden_unit"], total_samples['rewards'].shape[0] // self.fix_rollout_length * 1.2, # int(np.ceil(self._pool._max_size / self.fix_rollout_length * 4.0)),
         )
 
@@ -286,167 +260,119 @@ class MOPO(RLAlgorithm):
                             maxlen=self.fix_rollout_length, policy_hook=get_hidden,
                             fake_env=self.fake_env)
 
-        if el is not None:
-            import seaborn as sns
-            sns.set_style('darkgrid', {'legend.frameon': True})
-            self.fix_rollout_length = 10
-            self._env_pool = SimpleReplayTrajPool(
-                training_environment.observation_space, training_environment.action_space, self.fix_rollout_length,
-                self.network_kwargs["lstm_hidden_unit"], total_samples['rewards'].shape[0] // self.fix_rollout_length * 1.2, # int(np.ceil(self._pool._max_size / self.fix_rollout_length * 4.0)),
-            )
-            loader.restore_pool(self._env_pool, self._pool_load_path, self._pool_load_max_size,
-                                save_path=self._log_dir, adapt=True, maxlen=self.fix_rollout_length, policy_hook=get_hidden,
-                                fake_env=self.fake_env)
-            with self._session.as_default():
-                el.load_from_record_date()
-            self._train_model(batch_size=256, max_epochs=1,
-                              holdout_ratio=0.2, max_t=self._max_model_t, test_only=True)
-            self._reinit_pool()
-            def get_action(state, hidden, deterministic=False):
-                return self.get_action_meta(state, hidden, deterministic)
-
-            def make_init_hidden(batch_size=1):
-                return self.make_init_hidden(batch_size)
-
-            def do_plot(idx):
-                img = self._evaluation_environment._env.render(mode='rgb_array')
-                plt.imsave(f'./img/{idx}.png', img)
-            # evaluation_paths = self._evaluation_paths(
-            #     (lambda _state, _hidden: get_action(_state, _hidden, True), make_init_hidden),
-            #     self._evaluation_environment)
-            # bnn
-            # bnn merge obs
-            all_samples = self._env_pool.return_all_samples()
-            sample_num = all_samples['observations'].shape[0]#  * all_samples['observations'].shape[1]
-            select_idx = np.arange(0, all_samples['observations'].shape[0] - 1, all_samples['observations'].shape[0] / 1000).astype(np.int32)
-            os.makedirs('./pz', exist_ok=True)
-            from matplotlib import pyplot as plt
-            plt.cla()
-
-            for j in range(int(num_networks/2)):
-                pzs = []
-                print("test net j", j)
-                init_obs = obs = all_samples['observations'][:, 0]  # all_samples['observations'][select_idx.astype(np.int32)]
-                lst_acs = all_samples['last_actions'][:, 0]  # all_samples['last_actions'][select_idx.astype(np.int32)]
-                lst_p_hidden = all_samples['policy_hidden'][:, 0] # all_samples['policy_hidden'][select_idx.astype(np.int32)]
-                lst_hidden = (lst_p_hidden, np.expand_dims(lst_acs, axis=1))
-
-                for i in range(self.fix_rollout_length):
-                    mu, hidden = self.get_action_meta(obs, lst_hidden, deterministic=True,
-                                                      ret_z=True)
-                    lst_hidden = hidden[:2]
-                    pz = hidden[2]
-                    pzs.append(pz)
-
-                    obs_acs = np.concatenate([obs, mu], axis=-1)
-                    predict_obs_rew_mean, predict_obs_rew_var = self._model.predict(obs_acs, factored=True)
-                    # ensemble_samples = predict_obs_rew_mean + np.random.normal(
-                    #     size=predict_obs_rew_mean.shape) * predict_obs_rew_var
-                    ensemble_obs = predict_obs_rew_mean[..., :-1]
-                    predict_rew_mean = predict_obs_rew_mean[..., -1]
-                    obs = ensemble_obs[j]
-                    # obs = np.clip(obs, -50, 50)
-                    obs[np.any(np.abs(obs) > 50, axis=-1)] = all_samples['observations'][np.any(np.abs(obs) > 50, axis=-1), i] # np.nan
-                    # if i % 5 == 0 and i > 0:
-                    #     obs = all_samples['observations'][:, i]
-                    # obs[np.any(np.abs(obs) > 50, axis=-1)] = np.nan  # init_obs[np.any(np.abs(obs) > 100, axis=-1)]
-
-                pzs = np.array(pzs).squeeze()
-                cut_length = np.sum(np.isnan(np.nanmean(np.abs(pzs), axis=-1)).sum(axis=-1) < (sample_num - 200))
-                # cut_length = np.sum(np.isnan(np.nanmean(np.abs(pzs), axis=-1)).sum(axis=-1) < (sample_num - 1000))
-                pzs = pzs[:cut_length]
-                print(f"net {j}, avg z {np.nanmean(np.nanmean(np.abs(pzs[-3:]), axis=-1))}， length {cut_length}")
-                if cut_length >= 9:
-                    plt.plot(np.nanmean(np.nanmean(np.abs(pzs), axis=-1), axis=-1).squeeze())
-                else:
-                    print("skip a bad model", cut_length)
-            # plt.plot(np.abs(acs).mean(axis=-1))
-            plt.xlabel('rollout steps')
-            plt.ylabel('y')
-            plt.title(model_name.split('-')[0])
-            # plt.grid()
-            plt.savefig(f'./pz/pz-bnn-merge-{model_name}.pdf')
-
-
-            # obs = all_samples['observations'][0] # self._evaluation_environment.reset()
-            # lst_hidden = self.make_init_hidden(num_networks)
-            # ensemble_obs = np.repeat([[obs]], num_networks, axis=0)
-            # pzs = []
-            # for i in range(10):
-            #     mu, hidden = self.get_action_meta(ensemble_obs, lst_hidden, deterministic=True,
-            #                                       ret_z=True)
-            #     lst_hidden = hidden[:2]
-            #     pz = hidden[2]
-            #     pzs.append(pz)
-            #     # acs.append(mu)
-            #     # if i in [200, 400, 600]:
-            #     #     lst_hidden = self.make_init_hidden(1)
-            #     #     lst_hidden[0][0] -= 4
-            #     # mu += 0.1
-            #     obs_acs = np.concatenate([ensemble_obs, mu], axis=-1)
-            #     predict_obs_rew_mean = self._model.predict(obs_acs)[0]
-            #     ensemble_obs = predict_obs_rew_mean[..., :-1]
-            #     predict_rew_mean = predict_obs_rew_mean[..., -1]
-            #     # obs, rew, done, info = self._evaluation_environment.step(mu)
-            #     # do_plot(i)
-            #     # self._evaluation_environment.render()
-            #     # print("end i", i)
-            #     # if done:
-            #     #     break
-            # pzs = np.array(pzs).squeeze()
-            # # acs =np.array(acs).squeeze()
-            # from matplotlib import pyplot as plt
-            # plt.cla()
-            # plt.plot(np.abs(pzs).mean(axis=-1).squeeze())
-            # # plt.plot(np.abs(acs).mean(axis=-1))
-            # plt.savefig('./pz/pz-bnn-reset')
-
-            # real
-            multi_pzs = []
-            for j in range(20):
-                print("num j", j)
-                obs = self._evaluation_environment.reset()
-                lst_hidden = self.make_init_hidden(1)
-                pzs = []
-                acs = []
-                # self._evaluation_environment._env.unwrapped.model.opt.gravity[2] = -9.81 + dg
-                for i in range(1000):
-                    mu, hidden = self.get_action_meta(np.array([[obs['observations']]]), lst_hidden, deterministic=True,
-                                                      ret_z=True)
-                    lst_hidden = hidden[:2]
-                    pz = hidden[2]
-                    pzs.append(pz)
-                    acs.append(mu)
-                    if i in [200, 400, 600]:
-                        lst_hidden = self.make_init_hidden(1)
-                        lst_hidden[0][0] -= 4
-                    # mu += 0.1
-                    obs, rew, done, info = self._evaluation_environment.step(mu)
-                    # do_plot(i)
-                    # self._evaluation_environment.render()
-                    # print("end i", i)
-                    if done:
-                        break
-                pzs = np.array(pzs).squeeze()
-                multi_pzs.append(pzs)
-            # # acs =np.array(acs).squeeze()
-            # plt.cla()
-            # plt.plot(np.abs(pzs).mean(axis=-1).squeeze())
-            # plt.savefig('./pz/pz-real-reset')
-            # acs =np.array(acs).squeeze()
-            plt.cla()
-            plt.plot(np.abs(np.array(multi_pzs)).mean(axis=(0, -1)))
-            plt.xlabel('steps')
-            plt.ylabel('y')
-            plt.title(model_name.split('-')[0])
-            # plt.grid()
-            plt.savefig(f'./pz/pz-real-reset-{model_name}.pdf')
-
         print('[ DEBUG ] pool.size (after restore from pool) =', pool.size)
         self._init_pool_size = self._pool.size
         print('[ MOPO ] Starting with pool size: {}, env_pool size: {}'.format(self._init_pool_size, self._env_pool.size))
         print('[ DEBUG ] pool ptr: {}, pool max size: {}, pool size: {}'.format(self._env_pool._pointer, self._env_pool._max_size, self._env_pool.size))
         ####
+
+    def vis(self, el):
+        def get_hidden(state, action, last_action, length):
+            return self.get_action_hidden(state, action, last_action, length)
+
+        import seaborn as sns
+        sns.set_style('darkgrid', {'legend.frameon': True})
+        self.fix_rollout_length = 10
+        self._env_pool = SimpleReplayTrajPool(
+            self.training_environment.observation_space, self.training_environment.action_space, self.fix_rollout_length,
+            self.network_kwargs["lstm_hidden_unit"], self.total_samples['rewards'].shape[0] // self.fix_rollout_length * 1.2,
+            # int(np.ceil(self._pool._max_size / self.fix_rollout_length * 4.0)),
+        )
+        loader.restore_pool(self._env_pool, self._pool_load_path, self._pool_load_max_size,
+                            save_path=self._log_dir, adapt=True, maxlen=self.fix_rollout_length, policy_hook=get_hidden,
+                            fake_env=self.fake_env)
+        with self._session.as_default():
+            el.load_from_record_date()
+        self._train_model(batch_size=256, max_epochs=1,
+                          holdout_ratio=0.2, max_t=self._max_model_t, test_only=True)
+        self._reinit_pool()
+
+        all_samples = self._env_pool.return_all_samples()
+        sample_num = all_samples['observations'].shape[0]  # * all_samples['observations'].shape[1]
+        os.makedirs('./pz', exist_ok=True)
+        from matplotlib import pyplot as plt
+        plt.cla()
+
+        for j in range(int(self.num_networks / 2)):
+            pzs = []
+            print("test net j", j)
+            init_obs = obs = all_samples['observations'][:, 0]  # all_samples['observations'][select_idx.astype(np.int32)]
+            lst_acs = all_samples['last_actions'][:, 0]  # all_samples['last_actions'][select_idx.astype(np.int32)]
+            lst_p_hidden = all_samples['policy_hidden'][:,
+                           0]  # all_samples['policy_hidden'][select_idx.astype(np.int32)]
+            lst_hidden = (lst_p_hidden, np.expand_dims(lst_acs, axis=1))
+
+            for i in range(self.fix_rollout_length):
+                mu, hidden = self.get_action_meta(obs, lst_hidden, deterministic=True,
+                                                  ret_z=True)
+                lst_hidden = hidden[:2]
+                pz = hidden[2]
+                pzs.append(pz)
+
+                obs_acs = np.concatenate([obs, mu], axis=-1)
+                predict_obs_rew_mean, predict_obs_rew_var = self._model.predict(obs_acs, factored=True)
+
+                ensemble_obs = predict_obs_rew_mean[..., :-1]
+                obs = ensemble_obs[j]
+                obs[np.any(np.abs(obs) > 50, axis=-1)] = all_samples['observations'][
+                    np.any(np.abs(obs) > 50, axis=-1), i]  # np.nan
+
+            pzs = np.array(pzs).squeeze()
+            cut_length = np.sum(np.isnan(np.nanmean(np.abs(pzs), axis=-1)).sum(axis=-1) < (sample_num - 200))
+            # cut_length = np.sum(np.isnan(np.nanmean(np.abs(pzs), axis=-1)).sum(axis=-1) < (sample_num - 1000))
+            pzs = pzs[:cut_length]
+            print(f"net {j}, avg z {np.nanmean(np.nanmean(np.abs(pzs[-3:]), axis=-1))}， length {cut_length}")
+            if cut_length >= 9:
+                plt.plot(np.nanmean(np.nanmean(np.abs(pzs), axis=-1), axis=-1).squeeze())
+            else:
+                print("skip a bad model", cut_length)
+        # plt.plot(np.abs(acs).mean(axis=-1))
+        plt.xlabel('rollout steps')
+        plt.ylabel('y')
+        plt.title(self.model_name.split('-')[0])
+        # plt.grid()
+        plt.savefig(f'./pz/pz-bnn-merge-{self.model_name}.pdf')
+
+        # real
+        multi_pzs = []
+        for j in range(20):
+            print("num j", j)
+            obs = self._evaluation_environment.reset()
+            lst_hidden = self.make_init_hidden(1)
+            pzs = []
+            acs = []
+            # self._evaluation_environment._env.unwrapped.model.opt.gravity[2] = -9.81 + dg
+            for i in range(1000):
+                mu, hidden = self.get_action_meta(np.array([[obs['observations']]]), lst_hidden, deterministic=True,
+                                                  ret_z=True)
+                lst_hidden = hidden[:2]
+                pz = hidden[2]
+                pzs.append(pz)
+                acs.append(mu)
+                if i in [200, 400, 600]:
+                    lst_hidden = self.make_init_hidden(1)
+                    lst_hidden[0][0] -= 4
+                # mu += 0.1
+                obs, rew, done, info = self._evaluation_environment.step(mu)
+                # do_plot(i)
+                # self._evaluation_environment.render()
+                # print("end i", i)
+                if done:
+                    break
+            pzs = np.array(pzs).squeeze()
+            multi_pzs.append(pzs)
+        # # acs =np.array(acs).squeeze()
+        # plt.cla()
+        # plt.plot(np.abs(pzs).mean(axis=-1).squeeze())
+        # plt.savefig('./pz/pz-real-reset')
+        # acs =np.array(acs).squeeze()
+        plt.cla()
+        plt.plot(np.abs(np.array(multi_pzs)).mean(axis=(0, -1)))
+        plt.xlabel('steps')
+        plt.ylabel('y')
+        plt.title(self.model_name.split('-')[0])
+        # plt.grid()
+        plt.savefig(f'./pz/pz-real-reset-{self.model_name}.pdf')
 
 
     def _reinit_pool(self):
@@ -658,20 +584,9 @@ class MOPO(RLAlgorithm):
                                                                        initial_state=pre_state_p,
                                                                        dtype=tf.float32, sequence_length=seq_len)
 
-                if self.vae:
-                    policy_out_m = mlp(policy_out, hidden_sizes=[self.network_kwargs['embedding_size']],
-                                      activation=tf.tanh, output_activation=tf.tanh)
-                    policy_out_std = (mlp(policy_out, hidden_sizes=[self.network_kwargs['embedding_size']],
-                                       activation=tf.tanh, output_activation=tf.tanh) + 1.0001) * 0.6
-                    z_p_dis = tfd.Normal(loc=policy_out_m, scale=policy_out_std)
-                    policy_out1 = z_p_dis.sample()
-                    # policy_out_adp = mlp(policy_out, hidden_sizes=[self.network_kwargs['embedding_size']],
-                    #                   activation=tf.tanh, output_activation=tf.tanh)
-                    # policy_out1 = tf.concat([policy_out1, policy_out_adp], axis=-1)
-                else:
-                    policy_out1 = mlp(policy_out, hidden_sizes=[self.network_kwargs['embedding_size']],
-                                      activation=tf.tanh, output_activation=tf.tanh)
-                    z_p_dis = None
+                policy_out1 = mlp(policy_out, hidden_sizes=[self.network_kwargs['embedding_size']],
+                                  activation=tf.tanh, output_activation=tf.tanh)
+                z_p_dis = None
 
                 policy_state = tf.concat([policy_out1, x_ph], axis=-1)
 
@@ -686,18 +601,9 @@ class MOPO(RLAlgorithm):
                 value_out, next_value_hidden_out = tf.nn.dynamic_rnn(cells_value, lstm_input,
                                                                      initial_state=pre_state_v,
                                                                      dtype=tf.float32, sequence_length=seq_len)
-                if self.vae:
-                    value_out_m = mlp(value_out, hidden_sizes=[self.network_kwargs['embedding_size']],
-                                      activation=tf.tanh, output_activation=tf.tanh)
-                    value_out_std = (mlp(value_out, hidden_sizes=[self.network_kwargs['embedding_size']],
-                                       activation=tf.tanh, output_activation=tf.tanh) + 1.0001) * 0.6
-                    z_v_dis = tfd.Normal(loc=value_out_m, scale=value_out_std)
-                    value_out1 = z_v_dis.sample()
-
-                else:
-                    value_out1 = mlp(value_out, hidden_sizes=[self.network_kwargs['embedding_size']],
-                                     activation=tf.tanh, output_activation=tf.tanh)
-                    z_v_dis = None
+                value_out1 = mlp(value_out, hidden_sizes=[self.network_kwargs['embedding_size']],
+                                 activation=tf.tanh, output_activation=tf.tanh)
+                z_v_dis = None
                 value_state = tf.concat([value_out1, x_ph], axis=-1)
             policy_z = policy_out1
 
@@ -802,41 +708,7 @@ class MOPO(RLAlgorithm):
         self.Q_loss = (q1_loss + q2_loss) / 2
 
         # vae
-
-        if self.vae:
-            # decoder
-            def state_reward_decoder(z, prev_s, next_s, a):
-                with tf.variable_scope('decoder', reuse=tf.AUTO_REUSE):
-                    prev_s = mlp(prev_s, hidden_sizes=[32], activation=tf.nn.relu, output_activation=tf.nn.relu)
-                    next_s = mlp(next_s, hidden_sizes=[32], activation=tf.nn.relu, output_activation=tf.nn.relu)
-                    a = mlp(a, hidden_sizes=[16], activation=tf.nn.relu, output_activation=tf.nn.relu)
-
-                    input = tf.concat([prev_s, next_s, a, z], axis=-1)
-                    assert len(self._observation_shape) == 1
-                    state_rew_pred = mlp(input, hidden_sizes=[256, 256, 256, self._observation_shape[0] + 1],
-                                 activation=tf.nn.relu, output_activation=tf.nn.tanh)
-                    return state_rew_pred
-
-            z_target = tfd.Normal(loc=tf.zeros(self.network_kwargs['embedding_size']),
-                                  scale=tf.ones(self.network_kwargs['embedding_size']))
-
-            def compute_vae_loss(z_dis, name):
-                with tf.variable_scope('decoder-' + name, reuse=tf.AUTO_REUSE):
-                    z = z_dis.sample()
-                    z = z[:, 1:-1]
-                    a = self._actions_ph[:, 1:-1]
-                    prev_obs = self._observations_ph[:, :-2]
-                    next_obs = self._observations_ph[:, 2:]
-                    recons_state_rew = state_reward_decoder(z, prev_obs, next_obs, a)
-                    state_rew = tf.concat([self._observations_ph[:, 1:-1] - prev_obs, self._rewards_ph[:, 1:-1]], axis=-1)
-                    state_rew = tf.clip_by_value(state_rew, -20, 20) / 20
-                    recons_loss = tf.reduce_sum(tf.square(recons_state_rew - state_rew)) / valid_num
-                    kl_loss = tf.reduce_sum(z_dis.kl_divergence(z_target)) / valid_num
-                    return recons_loss, kl_loss
-            self.p_recons_loss, self.p_kl_loss = compute_vae_loss(z_p_dis, name='pi_vae')
-            self.v_recons_loss, self.v_kl_loss = compute_vae_loss(z_v_dis, name='v_vae')
-        else:
-            self.p_recons_loss = self.p_kl_loss = self.v_recons_loss = self.v_kl_loss = tf.no_op()
+        self.p_recons_loss = self.p_kl_loss = self.v_recons_loss = self.v_kl_loss = tf.no_op()
 
 
 
@@ -859,9 +731,6 @@ class MOPO(RLAlgorithm):
 
         pi_var_list = get_vars('main/pi')
         pi_var_list += get_vars("lstm_net_pi")
-        if self.vae:
-            policy_loss += self.p_recons_loss + 0.1 * self.p_kl_loss
-            pi_var_list += get_vars("pi_vae")
         train_pi_op = pi_optimizer.minimize(policy_loss, var_list=pi_var_list)
         pgrads, variables = zip(*pi_optimizer.compute_gradients(policy_loss, var_list=pi_var_list))
 
@@ -872,11 +741,6 @@ class MOPO(RLAlgorithm):
         value_params2 = get_vars('main/q2')
         value_params1 += get_vars("lstm_net_v")
         value_params2 += get_vars("lstm_net_v")
-        if self.vae:
-            value_params2 += get_vars("v_vae")
-            value_params1 += get_vars("v_vae")
-            q1_loss += 1.0 * (self.v_recons_loss + 0.1 * self.v_kl_loss)
-            q2_loss += 1.0 * (self.v_recons_loss + 0.1 * self.v_kl_loss)
         grads1, variables1 = zip(*value_optimizer1.compute_gradients(q1_loss, var_list=value_params1))
         grads2, variables2 = zip(*value_optimizer1.compute_gradients(q2_loss, var_list=value_params2))
         q1_grad, q_global_norm = tf.clip_by_global_norm(grads1, 10)
@@ -1162,16 +1026,14 @@ class MOPO(RLAlgorithm):
                     evaluation_environment, 'render_rollouts'):
                 training_environment.render_rollouts(evaluation_paths)
             if self._epoch % 20 == 0:
-                self.tester.sync_log_file()
+                tester.sync_log_file()
             # if self._epoch % 100 == 0:
             #     with self._session.as_default():
             #     # tester.time_step_holder.set_time()
             #         tester.save_checkpoint()
             ## ensure we did not collect any more data
             assert self._pool.size == self._init_pool_size
-            for k, v in diagnostics.items():
-                # print('[ DEBUG ] epoch: {} diagnostics k: {}, v: {}'.format(self._epoch, k, v))
-                self._writer.add_scalar(k, v, self._epoch)
+            logger.logkvs(diagnostics)
             logger.dump_tabular()
             if self._epoch % 4 == 0:
                 self._reinit_pool()
@@ -1284,7 +1146,7 @@ class MOPO(RLAlgorithm):
         penalty_ret = np.zeros((len(obs), 1))
         last_time = time.time()
         max_penalty = 0.
-        self.fake_env.reset(fix_env=self.fix_env, rollout_length=self._rollout_length, batch_size=rollout_batch_size)
+        self.fake_env.reset(rollout_length=self._rollout_length, batch_size=rollout_batch_size)
         for i in range(self._rollout_length):
             # print('[ DEBUG ] obs shape: {}'.format(obs.shape))
             lst_action = hidden[1]
@@ -1371,19 +1233,6 @@ class MOPO(RLAlgorithm):
         ))
         return rollout_stats
 
-    def _visualize_model(self, env, timestep):
-        ## save env state
-        state = env.unwrapped.state_vector()
-        qpos_dim = len(env.unwrapped.sim.data.qpos)
-        qpos = state[:qpos_dim]
-        qvel = state[qpos_dim:]
-
-        print('[ Visualization ] Starting | Epoch {} | Log dir: {}\n'.format(self._epoch, self._log_dir))
-        visualize_policy(env, self.fake_env, self._policy, self._writer, timestep)
-        print('[ Visualization ] Done')
-        ## set env state
-        env.unwrapped.set_state(qpos, qvel)
-
     def _do_training_repeats(self, timestep):
         """Repeat training _n_train_repeat times every _train_every_n_steps"""
         if timestep % self._train_every_n_steps > 0: return
@@ -1412,12 +1261,6 @@ class MOPO(RLAlgorithm):
         batch_size = batch_size or self.sampler._batch_size
         env_batch_size = int(batch_size*self._real_ratio)
         model_batch_size = batch_size - env_batch_size
-        # TODO: how to set teriminal state.
-        # TODO: how to set model pool.
-
-        ## can sample from the env pool even if env_batch_size == 0
-
-        # TODO (luofm): sample trajectories (k-branch mode)
         env_batch = self._env_pool.random_batch(env_batch_size)
 
         if model_batch_size > 0:
@@ -1427,17 +1270,9 @@ class MOPO(RLAlgorithm):
             keys = set(env_batch.keys()) & set(model_batch.keys())
             batch = {k: np.concatenate((env_batch[k], model_batch[k]), axis=0) for k in keys}
         else:
-            ## if real_ratio == 1.0, no model pool was ever allocated,
-            ## so skip the model pool sampling
             batch = env_batch
         return batch
 
-    # def _init_global_step(self):
-    #     self.global_step = training_util.get_or_create_global_step()
-    #     self._training_ops.update({
-    #         'increment_global_step': training_util._increment_global_step(1)
-    #     })
-    #
 
     def _init_training(self):
         self._session.run(self.target_init)

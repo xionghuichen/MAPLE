@@ -12,13 +12,13 @@ BACKUP_CONFIG:
   lib_dir: './build/lib/'
   backup_code_dir:
     - './maple'
-    - './softlearning'
     - './run_scripts'
 
 LOG_USED:
   - 'stdout'
   - 'log'
   - 'csv'
+  - 'tensorboard'
 
 DL_FRAMEWORK: 'tensorflow'
 SEND_LOG_FILE: False

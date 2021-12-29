@@ -43,7 +43,7 @@ MAX_PATH_LENGTH_PER_DOMAIN = {
 
 ALGORITHM_PARAMS_ADDITIONAL = {
     'MOPO': {
-        'type': 'MOPO',
+        'type': 'MAPLE',
         'kwargs': {
             'reparameterize': REPARAMETERIZE,
             'lr': 3e-4,

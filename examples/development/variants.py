@@ -41,7 +41,7 @@ MAX_PATH_LENGTH_PER_DOMAIN = {
 }
 
 ALGORITHM_PARAMS_BASE = {
-    'type': 'MOPO',
+    'type': 'MAPLE',
 
     'kwargs': {
         'epoch_length': 1000,
@@ -123,7 +123,7 @@ ALGORITHM_PARAMS_ADDITIONAL = {
         }
     },
     'MOPO': {
-        'type': 'MOPO',
+        'type': 'MAPLE',
         'kwargs': {
             'reparameterize': REPARAMETERIZE,
             'lr': 3e-4,
