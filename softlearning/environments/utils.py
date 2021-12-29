@@ -3,7 +3,7 @@ from .adapters.gym_adapter import (
     GymAdapter,
 )
 
-from mopo.env import env_overwrite
+from maple.env import env_overwrite
 
 ENVIRONMENTS = {
     'gym': GYM_ENVIRONMENTS,

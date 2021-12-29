@@ -19,6 +19,10 @@ def get_variant_spec(command_line_args):
     from run_scripts.base import get_variant_spec, get_task_spec
     params = get_params_from_file(command_line_args.config)
     variant_spec = get_variant_spec(command_line_args, params)
+    if 'neorl' in command_line_args.config:
+        variant_spec['environment_params']['training']['kwargs']['use_neorl'] = True
+    else:
+        variant_spec['environment_params']['training']['kwargs']['use_neorl'] = False
     variant_spec["info"] = command_line_args.info
     variant_spec['load_date'] = command_line_args.load_date
     variant_spec['load_task_name'] = command_line_args.load_task_name
@@ -34,34 +38,15 @@ def get_variant_spec(command_line_args):
     variant_spec['custom_config'] = command_line_args.custom_config
     variant_spec['elite_num'] = command_line_args.elite_num
     variant_spec['maple_200'] = command_line_args.maple_200
+    variant_spec['penalty_clip'] = command_line_args.penalty_clip
     variant_spec = get_task_spec(variant_spec)
     return variant_spec
 
 
 
-def add_command_line_args_to_variant_spec(variant_spec, command_line_args):
-    variant_spec['run_params'].update({
-        'checkpoint_frequency': (
-            command_line_args.checkpoint_frequency
-            if command_line_args.checkpoint_frequency is not None
-            else variant_spec['run_params'].get('checkpoint_frequency', 0)
-        ),
-        'checkpoint_at_end': (
-            command_line_args.checkpoint_at_end
-            if command_line_args.checkpoint_at_end is not None
-            else variant_spec['run_params'].get('checkpoint_at_end', True)
-        ),
-    })
-
-    variant_spec['restore'] = command_line_args.restore
-
-    return variant_spec
-
 import tensorflow as tf
 
 from softlearning.environments.utils import get_environment_from_params
-from softlearning.algorithms.utils import get_algorithm_from_variant
-from softlearning.policies.utils import get_policy
 from softlearning.replay_pools.utils import get_replay_pool_from_variant
 from softlearning.samplers.utils import get_sampler_from_variant
 
@@ -99,9 +84,6 @@ def main():
     # command_line_args = example_args
     print('vriant spec: {}'.format(variant_spec))
 
-    # variant_spec = add_command_line_args_to_variant_spec(variant_spec, command_line_args)
-
-
     # if command_line_args.video_save_frequency is not None:
     #     assert 'algorithm_params' in variant_spec
     #     variant_spec['algorithm_params']['kwargs']['video_save_frequency'] = (
@@ -118,7 +100,8 @@ def main():
     variant = copy.deepcopy(variant)
 
     tester.set_hyper_param(**variant)
-    tester.add_record_param(['info',"model_suffix", "penalty_coeff", "length", 'run_params.seed'])
+    tester.add_record_param(['info',"model_suffix", "penalty_coeff", "length",
+                             'maple_200', 'run_params.seed', 'penalty_clip'])
     tester.configure(task_name="v2_" + variant["config"], private_config_path=os.path.join(get_package_path(), 'rla_config_mopo.yaml'),
                      run_file='main.py', log_root=get_package_path())
     tester.log_files_gen()
@@ -145,9 +128,7 @@ def main():
 
     replay_pool = (get_replay_pool_from_variant(variant, training_environment))
     sampler = get_sampler_from_variant(variant)
-    # Qs = get_Q_function_from_variant(variant, training_environment)
-    # policy = get_policy_from_variant(variant, training_environment, Qs)
-    initial_exploration_policy = (get_policy('UniformPolicy', training_environment))
+
 
     #### get termination function
     domain = environment_params['training']['domain']
@@ -169,6 +150,7 @@ def main():
     kwargs = algorithm_kwargs.toDict()
 
     kwargs['penalty_coeff'] = variant['penalty_coeff']
+    kwargs['penalty_clip'] = variant['penalty_clip']
     kwargs['rollout_length'] = variant['length']
     kwargs['res_dyn'] = variant["res_dyn"]
     kwargs['norm_input'] = not variant["no_norm_input"]

@@ -228,6 +228,7 @@ NUM_CHECKPOINTS = 10
 
 
 def get_variant_spec_base(universe, domain, task, policy, algorithm, env_params):
+    print("get algorithms", algorithm)
     algorithm_params = deep_update(
         env_params,
         ALGORITHM_PARAMS_PER_DOMAIN.get(domain, {})
@@ -298,9 +299,6 @@ def get_variant_spec(args, env_params):
     universe, domain, task = env_params.universe, env_params.domain, env_params.task
     variant_spec = get_variant_spec_base(
         universe, domain, task, args.policy, env_params.type, env_params)
-    # if env_params.kwargs.use_neorl:
-    if 'use_neorl' in env_params.kwargs.keys():
-        variant_spec['environment_params']['training']['kwargs']['use_neorl'] = env_params.kwargs.use_neorl
     if args.checkpoint_replay_pool is not None:
         variant_spec['run_params']['checkpoint_replay_pool'] = (args.checkpoint_replay_pool)
     return variant_spec
@@ -315,7 +313,7 @@ NEORL_CONFIG = {
         },
     "halfcheetah":
         {
-            'commen': {
+            'common': {
                 'length': 15,
                 'penalty_coeff': 1.0,
             }
@@ -335,7 +333,7 @@ D4RL_MAPLE_CONFIG = {
     },
     'halfcheetah':{
         'common': {},
-        'med_expert':
+        'medium-expert':
             {
                 'penalty_coeff': 4.0,
             }
@@ -349,7 +347,7 @@ D4RL_MAPLE_200_CONFIG = {
     },
     'halfcheetah': {
         'common': {},
-        'med_expert':
+        'medium-expert':
             {
                 'length': 10,
                 'penalty_coeff': 4.0,
@@ -380,11 +378,14 @@ def get_task_spec(variant_spec):
             tasks = variant_spec['config'].split('.')[-1].split('_')
             if variant_spec['maple_200']:
                 variant_spec['model_suffix'] = 200
+                config = D4RL_MAPLE_200_CONFIG
             else:
                 variant_spec['model_suffix'] = 20
-                variant_spec.update(D4RL_MAPLE_CONFIG['common'])
-                if tasks[0] in D4RL_MAPLE_CONFIG.keys():
-                    variant_spec.update(D4RL_MAPLE_CONFIG[tasks[0]]['common'])
-                    if tasks[1] in D4RL_MAPLE_CONFIG[tasks[0]].keys():
-                        variant_spec.update(D4RL_MAPLE_CONFIG[tasks[0]][tasks[1]])
+                config = D4RL_MAPLE_CONFIG
+            variant_spec.update(config['common'])
+            if tasks[0] in config.keys():
+                variant_spec.update(config[tasks[0]]['common'])
+                behavior_type = '-'.join(tasks[1:])
+                if behavior_type in config[tasks[0]].keys():
+                    variant_spec.update(config[tasks[0]][behavior_type])
         return variant_spec

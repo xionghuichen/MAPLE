@@ -104,9 +104,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
 venv/
-ENV/
 env.bak/
 venv.bak/
 
@@ -130,6 +128,7 @@ dmypy.json
 
 
 **.npz
+luban_start_seed.sh
 
 code/**
 checkpoint/**

@@ -5,7 +5,7 @@ import pdb
 
 
 def import_fns(path, file, fns_name='StaticFns'):
-	full_path = os.path.join("mopo/static", file)
+	full_path = os.path.join("maple/policy/static", file)
 	import_path = full_path.replace('/', '.')
 	module = importlib.import_module(import_path)
 	fns = getattr(module, fns_name)

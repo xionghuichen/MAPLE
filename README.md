@@ -10,7 +10,7 @@ For better reproducibility, we uploaded a backup of dataset which is used in our
 
 After downloaded, you can push the data of D4RL to ~/.d4rl/datasets and NeoRL to {your path to MAPLE}/neorl_data/
 
-We have also upload the dynamics models for MAPLE training, which can be found in:
+We have also upload the dynamics models for MAPLE training, which can be found in: https://drive.google.com/drive/folders/1Ex9_RyJsafKaU2Eo5UgD34ZqJnJ25cru?usp=sharing
 
 # Installation
 

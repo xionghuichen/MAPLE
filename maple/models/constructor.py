@@ -6,13 +6,13 @@ from maple.models.bnn import BNN
 
 def construct_model(obs_dim=11, act_dim=3, rew_dim=1, hidden_dim=200, num_networks=7,
 					num_elites=5, session=None, model_type='mlp', separate_mean_var=False,
-					name=None, load_dir=None, deterministic=False, norm_input=True, res_dyn=False, source=None):
+					name=None, load_dir=None, deterministic=False, source=None):
 	if name is None:
 		name = 'BNN'
 	print('[ BNN ] Name {} | Observation dim {} | Action dim: {} | Hidden dim: {}'.format(name, obs_dim, act_dim, hidden_dim))
 	params = {'name': name, 'num_networks': num_networks, 'num_elites': num_elites,
 				'sess': session, 'separate_mean_var': separate_mean_var, 'deterministic': deterministic,
-			  'obs_dim': obs_dim, "norm_input": norm_input, "res_dyn": res_dyn, 'source': source}
+			  'obs_dim': obs_dim, 'source': source}
 
 	if load_dir is not None:
 		print('Specified load dir', load_dir)

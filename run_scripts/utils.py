@@ -240,8 +240,8 @@ def get_parser(allow_policy_list=False):
         )
     parser.add_argument(
         '--info', type=str, default='default_info')
-    parser.add_argument(
-        '--length', type=int, default=-1)
+    parser.add_argument('--length', type=int, default=-1)
+    parser.add_argument('--penalty_clip', type=int, default=20)
     parser.add_argument('--elite_num', type=int, default=-1)
     parser.add_argument( '--seed', type=int, default=88)
     parser.add_argument( '--n_epochs', type=int, default=1000)
@@ -308,15 +308,3 @@ def get_parser(allow_policy_list=False):
     return parser
 
 
-def variant_equals(*keys):
-    def get_from_spec(spec):
-        # TODO(hartikainen): This may break in some cases. ray.tune seems to
-        # add a 'config' key at the top of the spec, whereas `generate_variants`
-        # does not.
-        node = spec.get('config', spec)
-        for key in keys:
-            node = node[key]
-
-        return node
-
-    return sample_from(get_from_spec)

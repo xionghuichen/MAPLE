@@ -61,8 +61,7 @@ class MAPLE(RLAlgorithm):
             action_prior='uniform',
             reparameterize=False,
             store_extra_policy_info=False,
-            vae=False,
-            gru_state_dim=256,
+            penalty_clip=20,
             network_kwargs=None,
             deterministic=False,
             rollout_random=False,
@@ -80,8 +79,6 @@ class MAPLE(RLAlgorithm):
             separate_mean_var=False,
             identity_terminal=0,
             retrain=False,
-            res_dyn=False,
-            norm_input=True,
             pool_load_path='',
             pool_load_max_size=0,
             model_name=None,
@@ -119,8 +116,6 @@ class MAPLE(RLAlgorithm):
                                                                                                                                                      num_networks, rollout_length, self.sampler._batch_size))
 
 
-        self.res_dyn = res_dyn
-        self.norm_input = norm_input
         final_len = len(model_name.split('_')[-1])
         if '_smv' in model_name:
             self._env_name = model_name[:-(7+final_len)] + '-v0'
@@ -129,7 +124,6 @@ class MAPLE(RLAlgorithm):
         self.num_networks = num_networks
         model_name = self._env_name + ('_smv' if separate_mean_var else '') + '_{}_{}'.format(seed, num_networks)
         # name_prefix = ''.format(name_prefix)
-        # model_name = self._env_name + ('_smv' if separate_mean_var else '') + '_{}_{}_norm_{}_res_{}'.format(seed, num_networks, self.norm_input, self.res_dyn)
         self.model_name = model_name
         self._model_load_dir = model_load_dir
         if retrain:
@@ -157,10 +151,10 @@ class MAPLE(RLAlgorithm):
                                       num_networks=num_networks, num_elites=num_elites,
                                       model_type=model_type, separate_mean_var=separate_mean_var,
                                       name=model_name, load_dir=model_load_dir, deterministic=deterministic,
-                                      norm_input=self.norm_input, res_dyn=self.res_dyn, source=source)
+                                      source=source)
         print('[ MOPO ]: got self._model')
         self._static_fns = static_fns
-        self.max_penalty = MAX_PENALTY
+        self.max_penalty = penalty_clip
         self.fake_env = FakeEnv(self._model, self._static_fns, penalty_coeff=penalty_coeff,
                                 penalty_learned_var=penalty_learned_var, max_penalty=self.max_penalty)
 
