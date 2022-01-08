@@ -1,5 +1,9 @@
 # MAPLE
-The Official Code for  "[MAPLE:Offline Model-based Adaptable Policy Learning](https://proceedings.neurips.cc/paper/2021/hash/470e7a4f017a5476afb7eeb3f8b96f9b-Abstract.html)".
+The Official Code for  "[MAPLE: Offline Model-based Adaptable Policy Learning](https://proceedings.neurips.cc/paper/2021/hash/470e7a4f017a5476afb7eeb3f8b96f9b-Abstract.html)". 
+
+After being accepted in NeurIPS'21, we conducted experiments in [NeoRL](https://arxiv.org/abs/2102.00714). The results can be found in the following table.
+![](./resources/neorl-maple.png)
+In this process, we introduced parts of implementation tricks of [NeoRL version of MOPO](https://agit.ai/Polixir/OfflineRL/src/branch/master/offlinerl) into MAPLE, which also make the training process of MAPLE more stable.
 
 [comment]: <> (The Pytorch version of MAPLE can also been found in )
 
@@ -11,7 +15,7 @@ For better reproducibility, we uploaded a backup of dataset which is used in our
 
 After downloaded, you can push the data of D4RL to ~/.d4rl/datasets and NeoRL to {your path to MAPLE}/neorl_data/
 
-We have also upload the dynamics models for MAPLE-200 and MAPLE-NeoRL (which have 50 ensemble models) training, which can be found in: https://drive.google.com/drive/folders/1Ex9_RyJsafKaU2Eo5UgD34ZqJnJ25cru?usp=sharing.
+We have also uploaded the dynamics models for MAPLE-200 and MAPLE-NeoRL (which have 50 ensemble models) training, which can be found in: https://drive.google.com/drive/folders/1Ex9_RyJsafKaU2Eo5UgD34ZqJnJ25cru?usp=sharing.
 You can download the models to {path to MAPLE}/models to skip the dynamics model training process. 
 
 # Installation
