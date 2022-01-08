@@ -126,6 +126,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+.idea
 
 **.npz
 luban_start_*
