@@ -104,9 +104,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
 venv/
-ENV/
 env.bak/
 venv.bak/
 
@@ -127,3 +125,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+**.npz
+luban_start_*
+
+code/**
+checkpoint/**
+models/**
+results/**
+archive_tester/**
+log/**
