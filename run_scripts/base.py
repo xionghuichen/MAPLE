@@ -68,67 +68,14 @@ ALGORITHM_PARAMS_ADDITIONAL = {
             }
         }
     },
-    'SQL': {
-        'type': 'SQL',
-        'kwargs': {
-            'policy_lr': 3e-4,
-            'target_update_interval': 1,
-            'n_initial_exploration_steps': int(1e3),
-            'reward_scale': lambda spec: (
-                {
-                    'Swimmer': 30,
-                    'Hopper': 30,
-                    'HalfCheetah': 30,
-                    'HalfCheetahJump': 30,
-                    'Walker2d': 10,
-                    'Ant': 300,
-                    'AntAngle': 300,
-                    'Humanoid': 100,
-                    'Pendulum': 1,
-                }.get(
-                    spec['environment_params']['training']['domain'],
-                    1.0
-                ),
-            ),
-        }
-    },
-    'MVE': {
-        'type': 'MVE',
-        'kwargs': {
-            'reparameterize': REPARAMETERIZE,
-            'lr': 3e-4,
-            'target_update_interval': 1,
-            'tau': 5e-3,
-            'target_entropy': 'auto',
-            'store_extra_policy_info': False,
-            'action_prior': 'uniform',
-            'n_initial_exploration_steps': int(5000),
-        }
-    },
 }
 
 DEFAULT_NUM_EPOCHS = 200
 
 NUM_EPOCHS_PER_DOMAIN = {
-    'Swimmer': int(3e3),
     'Hopper': int(1e3),
     'HalfCheetah': int(1e3),
-    'HalfCheetahJump': int(3e3),
-    'HalfCheetahVel': int(500),
-    'HalfCheetahVelJump': int(3e3),
     'Walker2d': int(1e3),
-    'Ant': int(1000),
-    'AntAngle': int(3e3),
-    'Humanoid': int(1e4),
-    'Pusher2d': int(2e3),
-    'HandManipulatePen': int(1e4),
-    'HandManipulateEgg': int(1e4),
-    'HandManipulateBlock': int(1e4),
-    'HandReach': int(1e4),
-    'Point2DEnv': int(100),
-    'Point2DWallEnv': int(100),
-    'Reacher': int(200),
-    'Pendulum': 10,
 }
 
 ALGORITHM_PARAMS_PER_DOMAIN = {
@@ -143,86 +90,6 @@ ALGORITHM_PARAMS_PER_DOMAIN = {
     }
 }
 
-ENVIRONMENT_PARAMS = {
-    'Swimmer': {  # 2 DoF
-
-    },
-    'Hopper': {  # 3 DoF
-    },
-    'HalfCheetah': {  # 6 DoF
-    },
-    'HalfCheetahJump': {  # 6 DoF
-    },
-    'HalfCheetahVel': {  # 6 DoF
-    },
-    'HalfCheetahVelJump': {  # 6 DoF
-    },
-    'Walker2d': {  # 6 DoF
-    },
-    'Ant': {  # 8 DoF
-        'Parameterizable-v3': {
-            'healthy_reward': 0.0,
-            'healthy_z_range': (-np.inf, np.inf),
-            'exclude_current_positions_from_observation': False,
-        }
-    },
-    'AntAngle': {  # 8 DoF
-        'Parameterizable-v3': {
-            'healthy_reward': 0.0,
-            'healthy_z_range': (-np.inf, np.inf),
-            'exclude_current_positions_from_observation': False,
-        }
-    },
-    'Humanoid': {  # 17 DoF
-        'Parameterizable-v3': {
-            'healthy_reward': 0.0,
-            'healthy_z_range': (-np.inf, np.inf),
-            'exclude_current_positions_from_observation': False,
-        }
-    },
-    'Pusher2d': {  # 3 DoF
-        'Default-v3': {
-            'arm_object_distance_cost_coeff': 0.0,
-            'goal_object_distance_cost_coeff': 1.0,
-            'goal': (0, -1),
-        },
-        'DefaultReach-v0': {
-            'arm_goal_distance_cost_coeff': 1.0,
-            'arm_object_distance_cost_coeff': 0.0,
-        },
-        'ImageDefault-v0': {
-            'image_shape': (32, 32, 3),
-            'arm_object_distance_cost_coeff': 0.0,
-            'goal_object_distance_cost_coeff': 3.0,
-        },
-        'ImageReach-v0': {
-            'image_shape': (32, 32, 3),
-            'arm_goal_distance_cost_coeff': 1.0,
-            'arm_object_distance_cost_coeff': 0.0,
-        },
-        'BlindReach-v0': {
-            'image_shape': (32, 32, 3),
-            'arm_goal_distance_cost_coeff': 1.0,
-            'arm_object_distance_cost_coeff': 0.0,
-        }
-    },
-    'Point2DEnv': {
-        'Default-v0': {
-            'observation_keys': ('observation', 'desired_goal'),
-        },
-        'Wall-v0': {
-            'observation_keys': ('observation', 'desired_goal'),
-        },
-        'Offline-v0': {
-            'observation_keys': ('observation', 'desired_goal'),
-        },
-    },
-    'Point2DWallEnv': {
-        'Offline-v0': {
-            'observation_keys': ('observation', 'desired_goal'),
-        },
-    }
-}
 
 NUM_CHECKPOINTS = 10
 
@@ -245,8 +112,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, env_params)
                 'domain': domain,
                 'task': task,
                 'universe': universe,
-                'kwargs': (
-                    ENVIRONMENT_PARAMS.get(domain, {}).get(task, {})),
+                'kwargs': (),
             },
             'evaluation': lambda spec: (
                 spec['environment_params']['training']),
@@ -299,8 +165,6 @@ def get_variant_spec(args, env_params):
     universe, domain, task = env_params.universe, env_params.domain, env_params.task
     variant_spec = get_variant_spec_base(
         universe, domain, task, args.policy, env_params.type, env_params)
-    if args.checkpoint_replay_pool is not None:
-        variant_spec['run_params']['checkpoint_replay_pool'] = (args.checkpoint_replay_pool)
     return variant_spec
 
 NEORL_CONFIG = {
@@ -314,6 +178,7 @@ NEORL_CONFIG = {
     "halfcheetah":
         {
             'common': {
+                'penalty_clip': 4,
                 'length': 15,
                 'penalty_coeff': 1.0,
             }
@@ -335,6 +200,7 @@ D4RL_MAPLE_CONFIG = {
         'common': {},
         'medium-expert':
             {
+                'n_epochs': 2000,
                 'penalty_coeff': 4.0,
             }
     }
@@ -349,9 +215,14 @@ D4RL_MAPLE_200_CONFIG = {
         'common': {},
         'medium-expert':
             {
+                'n_epochs': 2000,
                 'length': 10,
                 'penalty_coeff': 4.0,
-            }
+            },
+        'mixed': {
+
+            'penalty_coeff': 4.0,
+        }
     },
     'hopper': {
         'common': {
@@ -363,11 +234,6 @@ def get_task_spec(variant_spec):
     if variant_spec["custom_config"]:
         return variant_spec
     else:
-        # variant_spec['model_suffix'] = command_line_args.model_suffix
-        # variant_spec['emb_size'] = command_line_args.emb_size
-        # variant_spec['length'] = command_line_args.length
-        # variant_spec['penalty_coeff'] = command_line_args.penalty_coeff
-        # variant_spec['elite_num'] = command_line_args.elite_num
         if variant_spec['environment_params']['training']['kwargs']['use_neorl']:
             if variant_spec['maple_200']:
                 assert "have not test maple_200 in neorl yet"

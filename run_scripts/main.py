@@ -23,22 +23,9 @@ def get_variant_spec(command_line_args):
         variant_spec['environment_params']['training']['kwargs']['use_neorl'] = True
     else:
         variant_spec['environment_params']['training']['kwargs']['use_neorl'] = False
-    variant_spec["info"] = command_line_args.info
-    variant_spec['load_date'] = command_line_args.load_date
-    variant_spec['load_task_name'] = command_line_args.load_task_name
-    variant_spec['not_inherit_hp'] = command_line_args.not_inherit_hp
-    variant_spec['config'] = command_line_args.config
-
+    for k,v in vars(command_line_args).items():
+        variant_spec[k] = v
     variant_spec['run_params']['seed'] = command_line_args.seed
-    variant_spec['retrain_model'] = command_line_args.retrain_model
-    variant_spec['emb_size'] = command_line_args.emb_size
-    variant_spec['no_norm_input'] = False  # command_line_args.no_norm_input
-    variant_spec['res_dyn'] = False  #  command_line_args.res_dyn
-    variant_spec['n_epochs'] = command_line_args.n_epochs
-    variant_spec['custom_config'] = command_line_args.custom_config
-    variant_spec['elite_num'] = command_line_args.elite_num
-    variant_spec['maple_200'] = command_line_args.maple_200
-    variant_spec['penalty_clip'] = command_line_args.penalty_clip
     variant_spec = get_task_spec(variant_spec)
     return variant_spec
 
@@ -152,8 +139,6 @@ def main():
     kwargs['penalty_coeff'] = variant['penalty_coeff']
     kwargs['penalty_clip'] = variant['penalty_clip']
     kwargs['rollout_length'] = variant['length']
-    kwargs['res_dyn'] = variant["res_dyn"]
-    kwargs['norm_input'] = not variant["no_norm_input"]
     kwargs['seed'] = variant['run_params']['seed']
     kwargs['retrain'] = retrain_model
     kwargs['network_kwargs']['embedding_size'] = variant['emb_size']

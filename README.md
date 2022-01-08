@@ -1,16 +1,18 @@
 # MAPLE
-The Official Code for Offline Model-based Adaptable Policy Learning
+The Official Code for  "[MAPLE:Offline Model-based Adaptable Policy Learning](https://proceedings.neurips.cc/paper/2021/hash/470e7a4f017a5476afb7eeb3f8b96f9b-Abstract.html)".
 
+[comment]: <> (The Pytorch version of MAPLE can also been found in )
 
 # [optional] Download Resources
 
-For better reproducibility, we uploaded a backup of dataset which is used in our experiment, since we found that the content of dataset in D4RL and NeoRL might be changed.   
+For better reproducibility, we uploaded a backup of dataset which is used in our experiment, since we found that the content of dataset in [D4RL](https://github.com/rail-berkeley/d4rl) and [NeoRL](https://github.com/polixir/NeoRL) might be changed.   
 - D4RL: https://drive.google.com/drive/folders/1kgNg6xLHRTyb_tzDQULezB9XYGNuakCM?usp=sharing
 - NeoRL: https://drive.google.com/drive/folders/1gZdVQTY_7FLCFGqszHF9sfKcXT8epoze?usp=sharing
 
 After downloaded, you can push the data of D4RL to ~/.d4rl/datasets and NeoRL to {your path to MAPLE}/neorl_data/
 
-We have also upload the dynamics models for MAPLE training, which can be found in: https://drive.google.com/drive/folders/1Ex9_RyJsafKaU2Eo5UgD34ZqJnJ25cru?usp=sharing
+We have also upload the dynamics models for MAPLE-200 and MAPLE-NeoRL (which have 50 ensemble models) training, which can be found in: https://drive.google.com/drive/folders/1Ex9_RyJsafKaU2Eo5UgD34ZqJnJ25cru?usp=sharing.
+You can download the models to {path to MAPLE}/models to skip the dynamics model training process. 
 
 # Installation
 
@@ -47,9 +49,6 @@ python main.py --config examples.config.d4rl.walker2d_medium_expert --maple_200
 python main.py --config examples.config.d4rl.walker2d_medium_expert --custom_config --penalty_coeff 1.0
 ```
 
-The training logs can be found in {your MAPLE path}/log. You can use tensorbard to check and also use the tools in RLA to visualize.
+The training logs can be found in {your MAPLE path}/log. You can use tensorbard to check and also use the tools in RLA to visualize (e.g., ```RLA.easy_plot.plot_func.plot_res_func```).
 There are also some scrips in ``./rla_scrips`` to manage the experimental logs. 
 
-# Refernece
-
- 

@@ -128,7 +128,7 @@ dmypy.json
 
 
 **.npz
-luban_start_seed.sh
+luban_start_*
 
 code/**
 checkpoint/**

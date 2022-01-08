@@ -241,7 +241,7 @@ def get_parser(allow_policy_list=False):
     parser.add_argument(
         '--info', type=str, default='default_info')
     parser.add_argument('--length', type=int, default=-1)
-    parser.add_argument('--penalty_clip', type=int, default=20)
+    parser.add_argument('--penalty_clip', type=float, default=20)
     parser.add_argument('--elite_num', type=int, default=-1)
     parser.add_argument( '--seed', type=int, default=88)
     parser.add_argument( '--n_epochs', type=int, default=1000)
@@ -250,7 +250,7 @@ def get_parser(allow_policy_list=False):
     parser.add_argument(
         '--emb_size', type=int, default=16)
     parser.add_argument(
-        '--model_suffix', type=str, default='0')
+        '--model_suffix', type=int, default=-1)
     parser.add_argument(
         '--load_date', type=str, default='')
     parser.add_argument('--load_task_name', type=str, default='')
@@ -258,16 +258,6 @@ def get_parser(allow_policy_list=False):
     parser.add_argument('--maple_200', action='store_true')
     parser.add_argument('--custom_config', action='store_true')
     parser.add_argument('--retrain_model', action='store_true')
-    parser.add_argument(
-        '--checkpoint-replay-pool',
-        type=lambda x: bool(strtobool(x)),
-        default=None,
-        help=("Whether a checkpoint should also saved the replay"
-              " pool. If set, takes precedence over"
-              " variant['run_params']['checkpoint_replay_pool']."
-              " Note that the replay pool is saved (and "
-              " constructed) piece by piece so that each"
-              " experience is saved only once."))
 
     if allow_policy_list:
         parser.add_argument(
@@ -283,27 +273,7 @@ def get_parser(allow_policy_list=False):
             choices=('gaussian', ),
             default='gaussian')
 
-    # parser.add_argument(
-    #     '--exp-name',
-    #     type=str,
-    #     default=datetimestamp())
-    parser.add_argument('--mode', type=str, default='local')
-    parser.add_argument(
-        '--confirm-remote',
-        type=lambda x: bool(strtobool(x)),
-        nargs='?',
-        const=True,
-        default=True,
-        help="Whether or not to query yes/no on remote run.")
 
-    parser.add_argument(
-        '--video-save-frequency',
-        type=int,
-        default=None,
-        help="Save frequency for videos.")
-
-    parser = add_ray_init_args(parser)
-    parser = add_ray_tune_args(parser)
 
     return parser
 
