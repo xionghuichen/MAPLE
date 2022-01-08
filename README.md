@@ -3,7 +3,7 @@ The Official Code for  "[MAPLE: Offline Model-based Adaptable Policy Learning](h
 
 After being accepted in NeurIPS'21, we conducted experiments in [NeoRL](https://arxiv.org/abs/2102.00714). The results can be found in the following table.
 ![](./resources/neorl-maple.png)
-In this process, we introduced parts of implementation tricks of [NeoRL version of MOPO](https://agit.ai/Polixir/OfflineRL/src/branch/master/offlinerl) into MAPLE, which also make the training process of MAPLE more stable.
+In this process, we introduced parts of implementation tricks in [the NeoRL version of MOPO](https://agit.ai/Polixir/OfflineRL/src/branch/master/offlinerl) into MAPLE, which also make the training process of MAPLE more stable.
 
 [comment]: <> (The Pytorch version of MAPLE can also been found in )
 
