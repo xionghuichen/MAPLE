@@ -201,7 +201,7 @@ D4RL_MAPLE_CONFIG = {
         'medium-expert':
             {
                 'n_epochs': 2000,
-                'penalty_coeff': 4.0,
+                'penalty_coeff': 5.0,
             }
     }
 }
@@ -217,11 +217,10 @@ D4RL_MAPLE_200_CONFIG = {
             {
                 'n_epochs': 2000,
                 'length': 10,
-                'penalty_coeff': 4.0,
+                'penalty_coeff': 5.0,
             },
         'mixed': {
-
-            'penalty_coeff': 4.0,
+            'penalty_clip': 4.0,
         }
     },
     'hopper': {

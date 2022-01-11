@@ -13,7 +13,7 @@ class StaticFns:
             not_done = np.logical_and(np.all(next_obs >= -1 * STATE_CLIP_BOUND, axis=-1), np.all(next_obs <= STATE_CLIP_BOUND, axis=-1))
         else:
             not_done = np.array([True]).repeat(len(obs))
-            not_done = np.logical_and(np.all(next_obs >  -1 * STATE_CLIP_BOUND, axis=-1), np.all(next_obs < STATE_CLIP_BOUND, axis=-1))
+            not_done = np.logical_and(np.all(next_obs > -1 * STATE_CLIP_BOUND, axis=-1), np.all(next_obs < STATE_CLIP_BOUND, axis=-1))
         done = ~not_done
         done = done[:,None]
         return done

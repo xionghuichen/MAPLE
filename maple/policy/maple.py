@@ -155,6 +155,7 @@ class MAPLE(RLAlgorithm):
         print('[ MOPO ]: got self._model')
         self._static_fns = static_fns
         self.max_penalty = penalty_clip
+
         self.fake_env = FakeEnv(self._model, self._static_fns, penalty_coeff=penalty_coeff,
                                 penalty_learned_var=penalty_learned_var, max_penalty=self.max_penalty)
 
@@ -221,7 +222,12 @@ class MAPLE(RLAlgorithm):
 
         total_samples = self._pool.return_all_samples()
         self.total_samples = total_samples
-        self.min_rewards = np.min(total_samples['rewards']) - self.max_penalty * penalty_coeff
+        if self._env_name == 'halfcheetah-medium-expert-v0':
+            # In some seeds, the Q loss will not be reduced if the lower bound of rewards is too tight.
+            soft_bound = 1.2
+        else:
+            soft_bound = 1.0
+        self.min_rewards = np.min(total_samples['rewards']) - self.max_penalty * penalty_coeff * soft_bound
         self.max_raw_rew = self.max_rewards = np.max(total_samples['rewards'])
         self.min_raw_rew = np.min(total_samples['rewards'])
         self.max_state = np.max(total_samples['observations'], axis=0)
@@ -320,7 +326,6 @@ class MAPLE(RLAlgorithm):
                 plt.plot(np.nanmean(np.nanmean(np.abs(pzs), axis=-1), axis=-1).squeeze())
             else:
                 print("skip a bad model", cut_length)
-        # plt.plot(np.abs(acs).mean(axis=-1))
         plt.xlabel('rollout steps')
         plt.ylabel('y')
         plt.title(self.model_name.split('-')[0])
@@ -355,11 +360,6 @@ class MAPLE(RLAlgorithm):
                     break
             pzs = np.array(pzs).squeeze()
             multi_pzs.append(pzs)
-        # # acs =np.array(acs).squeeze()
-        # plt.cla()
-        # plt.plot(np.abs(pzs).mean(axis=-1).squeeze())
-        # plt.savefig('./pz/pz-real-reset')
-        # acs =np.array(acs).squeeze()
         plt.cla()
         plt.plot(np.abs(np.array(multi_pzs)).mean(axis=(0, -1)))
         plt.xlabel('steps')
@@ -462,7 +462,7 @@ class MAPLE(RLAlgorithm):
         _next_observation = self._next_observations_ph # ( - self.shift) / self.scale
         # inner functions
         LOG_STD_MAX = 2
-        LOG_STD_MIN = -5  # reset (应该没啥影响)
+        LOG_STD_MIN = -5
         EPS = 1e-8
         valid_num = tf.reduce_sum(tf.reduce_sum(self._valid_ph[:, :, 0]))
 
@@ -495,21 +495,7 @@ class MAPLE(RLAlgorithm):
             # Squash those unbounded actions!
             mu = tf.tanh(mu)
             pi = tf.tanh(pi)
-            # offlineRL implementation
-            # raw_actions = atanh(tf.tanh(pi))
-            # actions = tf.tanh(raw_actions)
-            # # logits, h = self.preprocess(obs)
-            # mean = mu # self.mu(logits)
-            # mu = tf.clip_by_value(mean, -9, 9)  # reset
-            # # mean = torch.clamp(mean, -9, 9)
-            # normal = tf.contrib.distributions.Normal(mu, std)
-            # # tanh_normal = TanhNormal(mean, std)
-            # # log_prob = tanh_normal.log_prob(value=pi, pre_tanh_value=raw_actions)
-            # logp_pi = normal.log_prob(raw_actions) - tf.log(1 - actions * actions + 1e-6)
-            # logp_pi = tf.reduce_sum(logp_pi, axis=-1)
-            # # Squash those unbounded actions!
-            # mu = tf.tanh(mu)
-            # pi = tf.tanh(raw_actions)
+
             return mu, pi, logp_pi
 
         def mlp_gaussian_policy(x, a, hidden_sizes, activation, output_activation):
@@ -520,7 +506,7 @@ class MAPLE(RLAlgorithm):
             # def var_scal_uni(*args, partition_info=None, **kwargs):
             #     return tf.variance_scaling_initializer(*args, **kwargs, distribution="uniform")
             net = mlp(x, list(hidden_sizes), activation, activation)
-            # neorl implementation
+            # the comments are the neorl's MOPO implementation but have not significant different in results.
             # net = mlp(x, [256] + list(hidden_sizes) + [256], activation, None,)
                       # kernel_initializer=tf.variance_scaling_initializer(distribution="uniform"),
                       # bias_initializer=tf.variance_scaling_initializer(distribution="uniform"))
@@ -531,7 +517,7 @@ class MAPLE(RLAlgorithm):
                                       # kernel_initializer=tf.variance_scaling_initializer(distribution="uniform"),
                                       # bias_initializer=tf.variance_scaling_initializer(distribution="uniform"))
 
-            mu = tf.clip_by_value(mu, -9, 9)  # trick in neoRL and it will improve the performance in parts of the tasks.
+            mu = tf.clip_by_value(mu, -9, 9)  # a trick in neoRL and it will improve the performance in parts of the tasks.
             log_std = tf.clip_by_value(log_std, LOG_STD_MIN, LOG_STD_MAX)
             std = tf.exp(log_std)
             pi = mu + tf.random_normal(tf.shape(mu)) * std
@@ -549,12 +535,9 @@ class MAPLE(RLAlgorithm):
             # vfs
             # test again
             # neorl
-            # if self.source == 'neorl':
-            #     vf_mlp = lambda x: tf.squeeze(mlp(x, list(hidden_sizes) + [256, 256, 1], tf.nn.swish, None), axis=-1)
-            # elif self.source == 'd4rl':
+            # vf_mlp = lambda x: tf.squeeze(mlp(x, list(hidden_sizes) + [256, 256, 1], tf.nn.swish, None), axis=-1)
+
             vf_mlp = lambda x: tf.squeeze(mlp(x, list(hidden_sizes) + [1], activation, None), axis=-1)
-            # else:
-            #     raise NotImplementedError
 
             with tf.variable_scope('q1'):
                 q1 = vf_mlp(tf.concat([x_v, a], axis=-1))
@@ -568,11 +551,6 @@ class MAPLE(RLAlgorithm):
             with tf.variable_scope("lstm_net_p", reuse=tf.AUTO_REUSE):
                 lstm_input = state_acs
 
-                # cells_policy = []
-                # for h in self.lstm_hidden_layers:
-                #     cells_policy.append(tf.nn.rnn_cell.GRUCell(num_units=h))
-                # cells_policy = tf.nn.rnn_cell.MultiRNNCell(cells=cells_policy,
-                #                                                 state_is_tuple=False)
                 cells_policy = tf.nn.rnn_cell.GRUCell(num_units=self.network_kwargs["lstm_hidden_unit"])
                 policy_out, next_policy_hidden_out = tf.nn.dynamic_rnn(cells_policy, lstm_input,
                                                                        initial_state=pre_state_p,
@@ -585,11 +563,6 @@ class MAPLE(RLAlgorithm):
                 policy_state = tf.concat([policy_out1, x_ph], axis=-1)
 
             with tf.variable_scope("lstm_net_v", reuse=tf.AUTO_REUSE):
-                # cells_policy = []
-                # for h in self.lstm_hidden_layers:
-                #     cells_policy.append(tf.nn.rnn_cell.GRUCell(num_units=h))
-                # cells_policy = tf.nn.rnn_cell.MultiRNNCell(cells=cells_policy,
-                #                                                 state_is_tuple=False)
                 lstm_input = state_acs
                 cells_value = tf.nn.rnn_cell.GRUCell(num_units=self.network_kwargs["lstm_hidden_unit"])
                 value_out, next_value_hidden_out = tf.nn.dynamic_rnn(cells_value, lstm_input,
@@ -643,10 +616,6 @@ class MAPLE(RLAlgorithm):
         with tf.variable_scope('target'):
             # target q values, using actions from *current* policy
             _, _, _, q1_targ, q2_targ, _ = mlp_actor_critic(policy_state2, value_state2, pi_next, **ac_kwargs)
-
-        # actions = self._policy.actions([self._observations_ph])
-        # log_pis = self._policy.log_pis([self._observations_ph], actions)
-        # assert log_pis.shape.as_list() == [None, 1]
 
         # alpha optimizer
         log_alpha = self._log_alpha = tf.get_variable(
@@ -1195,10 +1164,6 @@ class MAPLE(RLAlgorithm):
             for k in samples:
                 self._model_pool.fields[k][index, i] = samples[k][:, 0]
                 # sample_list.append(samples)
-            # print('[ DEBUG ]: obs: \n', samples['observations'], ', action: \n', samples['actions'], 'next_obs: \n',
-            #       samples['next_observations'],
-            #       ', term: \n', samples['terminals'], ', valid: \n', samples['valid'], ', last_action: \n',
-            #       samples['last_actions'], 'obs shape: ', samples['observations'].shape)
             current_nonterm = current_nonterm & nonterm_mask
             obs = next_obs
             # if nonterm_mask.sum() == 0:
@@ -1209,13 +1174,6 @@ class MAPLE(RLAlgorithm):
         self._model_pool._pointer += num_samples
         self._model_pool._pointer %= self._model_pool._max_size
         self._model_pool._size = min(self._model_pool._max_size, self._model_pool._size + num_samples)
-        #     samples = {}
-        #     for k in sample_list[0]:
-        #         data = np.concatenate([item[k] for item in sample_list], axis=1)
-        #         samples[k] = data
-        #         # print('[ DEBUG ]: shape of data: ', np.shape(data))
-        #         # print(k, data[0])
-        #     self._model_pool.add_samples(samples)
         mean_rollout_length = sum(steps_added) / rollout_batch_size
         rollout_stats = {'mean_rollout_length': mean_rollout_length,
                          'mean_rollout_reward': np.mean(samples['rewards']),
@@ -1236,8 +1194,6 @@ class MAPLE(RLAlgorithm):
         if trained_enough: return
         log_buffer = []
         logs = {}
-        # print('[ DEBUG ]: repeat training {} times'.format(self._n_train_repeat))
-        # print('[ DEBUG ]: ' + '-' * 30)
         for i in range(self._n_train_repeat):
             logs = self._do_training(
                 iteration=timestep,
@@ -1356,14 +1312,6 @@ class MAPLE(RLAlgorithm):
             'Q_loss': np.mean(Q_losses),
             'alpha': alpha,
         })
-
-        # TODO (luofm): policy diagnostics
-        # policy_diagnostics = self._policy.get_diagnostics(
-        #     batch['observations'])
-        # diagnostics.update({
-        #     'policy/{}'.format(key): value
-        #     for key, value in policy_diagnostics.items()
-        # })
 
         if self._plotter:
             self._plotter.draw()
