@@ -55,5 +55,7 @@ python main.py --config examples.config.d4rl.walker2d_medium_expert --custom_con
 
 The training logs can be found in {your MAPLE path}/log. You can use tensorbard to check and also use the tools in RLA to visualize (e.g., ```RLA.easy_plot.plot_func.plot_res_func```).
 You can check plot_demo.ipynb for more details. The figure of the simplest setting will be something like this:
+
 ![](./resources/plot_demo.png)
+
 There are also some scrips in ``./rla_scrips`` to manage the experimental logs. 
