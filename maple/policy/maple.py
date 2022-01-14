@@ -35,15 +35,7 @@ def get_vars(scope):
 
 
 class MAPLE(RLAlgorithm):
-    """Model-based Offline Policy Optimization (MOPO)
-
-    References
-    ----------
-        Tianhe Yu, Garrett Thomas, Lantao Yu, Stefano Ermon, James Zou, Sergey Levine, Chelsea Finn, Tengyu Ma.
-        MOPO: Model-based Offline Policy Optimization.
-        arXiv preprint arXiv:2005.13239. 2020.
-    """
-
+    
     def __init__(
             self,
             training_environment,
