@@ -5,7 +5,7 @@ After being accepted in NeurIPS'21, we conducted experiments in [NeoRL](https://
 ![](./resources/neorl-maple.png)
 \* In this process, we introduced parts of implementation tricks in [the NeoRL version of MOPO](https://agit.ai/Polixir/OfflineRL/src/branch/master/offlinerl) into MAPLE, which also make the training process of MAPLE more stable in NeoRL tasks and keep (or further improve) the performance in D4RL.
 
-[comment]: <> (The Pytorch version of MAPLE can also been found in )
+[comment]: <> (The Pytorch version of MAPLE can also be found in )
 
 # [optional] Download Resources
 
@@ -20,7 +20,7 @@ You can download the models to {path to MAPLE}/models to skip the dynamics model
 
 # Installation
 
-We use RLAssistant to manage our experiments. You can download and install it via:
+We use [RLAssistant](https://github.com/xionghuichen/RLAssistant) to manage our experiments. You can download and install it via:
 ```
 git clone https://github.com/xionghuichen/RLAssistant.git
 cd RLAssistant
@@ -29,7 +29,7 @@ pip install -e .
 Then you can install MAPLE via:
 ```
 git clone https://github.com/xionghuichen/MAPLE.git
-cd RLAssistant
+cd MAPLE
 pip install -e .
 ```
 
@@ -54,5 +54,8 @@ python main.py --config examples.config.d4rl.walker2d_medium_expert --custom_con
 ```
 
 The training logs can be found in {your MAPLE path}/log. You can use tensorbard to check and also use the tools in RLA to visualize (e.g., ```RLA.easy_plot.plot_func.plot_res_func```).
-There are also some scrips in ``./rla_scrips`` to manage the experimental logs. You can check plot_demo.ipynb for more details. The figure of the simplest setting will be something like this:
+You can check plot_demo.ipynb for more details. The figure of the simplest setting will be something like this:
+
 ![](./resources/plot_demo.png)
+
+There are also some scrips in ``./rla_scrips`` to manage the experimental logs. 
