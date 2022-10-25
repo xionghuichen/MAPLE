@@ -16,7 +16,7 @@ from maple.models.utils import get_required_argument, TensorStandardScaler
 from maple.models.fc import FC
 
 from maple.utils.logging import Progress, Silent
-from RLA.easy_log import logger
+from RLA import logger
 from RLA.easy_log.tester import tester
 np.set_printoptions(precision=5)
 

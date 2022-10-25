@@ -137,3 +137,5 @@ models/**
 results/**
 archive_tester/**
 log/**
+archived/**
+.DS_Store

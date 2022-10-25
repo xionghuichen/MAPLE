@@ -20,7 +20,10 @@ DEFAULT_REPLAY_POOL = 'SimpleReplayPool'
 
 def get_replay_pool_from_variant(variant, env, *args, **kwargs):
     replay_pool_params = variant['replay_pool_params']
-    replay_pool_params["kwargs"]["max_size"] = replay_pool_params["kwargs"]["max_size"](variant)
+    if isinstance(replay_pool_params["kwargs"]["max_size"], int):
+        replay_pool_params["kwargs"]["max_size"] = replay_pool_params["kwargs"]["max_size"]
+    else:
+        replay_pool_params["kwargs"]["max_size"] = replay_pool_params["kwargs"]["max_size"](variant)
     replay_pool_type = replay_pool_params['type']
     replay_pool_kwargs = deepcopy(replay_pool_params['kwargs'])
     print('[ DEBUG ]: replay pool config: ', replay_pool_kwargs)

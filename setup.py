@@ -16,7 +16,10 @@ setup(
         )
     },
     install_requires=[
-        "RLA>=0.3",
+        "RLA @ git+https://github.com/polixir/RLAssistant.git@main#egg=RLA",
+        "serializable @ git+https://github.com/hartikainen/serializable.git@76516385a3a716ed4a2a9ad877e2d5cbcf18d4e6#egg=serializable",
+        'gtimer',
+        'dotmap',
     ],
     zip_safe=True,
     license='MIT'

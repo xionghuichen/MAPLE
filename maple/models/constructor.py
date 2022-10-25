@@ -11,7 +11,7 @@ def construct_model(obs_dim=11, act_dim=3, rew_dim=1, hidden_dim=200, num_networ
 		name = 'BNN'
 	print('[ BNN ] Name {} | Observation dim {} | Action dim: {} | Hidden dim: {}'.format(name, obs_dim, act_dim, hidden_dim))
 	params = {'name': name, 'num_networks': num_networks, 'num_elites': num_elites,
-				'sess': session, 'separate_mean_var': separate_mean_var, 'deterministic': deterministic,
+			  'sess': session, 'separate_mean_var': separate_mean_var, 'deterministic': deterministic,
 			  'obs_dim': obs_dim, 'source': source}
 
 	if load_dir is not None:

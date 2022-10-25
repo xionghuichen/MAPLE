@@ -23,7 +23,7 @@ from maple.utils.logging import Progress
 import maple.utils.filesystem as filesystem
 import maple.dataset.loader as loader
 from RLA.easy_log.tester import tester
-from RLA.easy_log import logger
+from RLA import logger
 from d4rl import infos
 from maple.global_config import *
 
@@ -266,7 +266,7 @@ class MAPLE(RLAlgorithm):
         sns.set_style('darkgrid', {'legend.frameon': True})
         self.fix_rollout_length = 10
         self._env_pool = SimpleReplayTrajPool(
-            self.training_environment.observation_space, self.training_environment.action_space, self.fix_rollout_length,
+            self._training_environment.observation_space, self._training_environment.action_space, self.fix_rollout_length,
             self.network_kwargs["lstm_hidden_unit"], self.total_samples['rewards'].shape[0] // self.fix_rollout_length * 1.2,
             # int(np.ceil(self._pool._max_size / self.fix_rollout_length * 4.0)),
         )
@@ -360,6 +360,47 @@ class MAPLE(RLAlgorithm):
         # plt.grid()
         plt.savefig(f'./pz/pz-real-reset-{self.model_name}.pdf')
 
+    def performance_ns(self, el):
+        with self._session.as_default():
+            el.load_from_record_date()
+        self._train_model(batch_size=256, max_epochs=1,
+                          holdout_ratio=0.2, max_t=self._max_model_t, test_only=True)
+        self._reinit_pool()
+        type_map = {
+            'halfcheetah': 'gravity',
+            'hopper': 'friction',
+            'walker2d': 'dense'
+        }
+        parameter_type = type_map[tester.hyper_param['environment_params']['training']['domain']]
+        for parameter_coeff in [0.5, 1.5]:
+            if parameter_type == 'friction':
+                self._evaluation_environment.unwrapped.model.geom_friction[
+                :] = self._evaluation_environment.unwrapped.model.geom_friction[:] * parameter_coeff
+            elif parameter_type == 'gravity':
+                self._evaluation_environment.unwrapped.model.opt.gravity[
+                :] = self._evaluation_environment.unwrapped.model.opt.gravity[:] * parameter_coeff
+            elif parameter_type == 'dense':
+                self._evaluation_environment.unwrapped.model.body_mass[
+                :] = self._evaluation_environment.unwrapped.model.body_mass[:] * parameter_coeff
+            rets = []
+            for j in range(20):
+                obs = self._evaluation_environment.reset()
+                lst_hidden = self.make_init_hidden(1)
+                ret = 0
+                for i in range(1000):
+                    mu, hidden = self.get_action_meta(np.array([[obs['observations']]]), lst_hidden, deterministic=True,
+                                                      ret_z=True)
+                    lst_hidden = hidden[:2]
+                    obs, rew, done, info = self._evaluation_environment.step(mu)
+                    ret += rew
+                    if done:
+                        norm_rt = (ret - self.min_ret) / (self.max_ret - self.min_ret)
+                        rets.append(norm_rt)
+                        break
+                if not done:
+                    norm_rt = (ret - self.min_ret) / (self.max_ret - self.min_ret)
+                    rets.append(norm_rt)
+            print(f'{self.model_name}, {parameter_type}, {parameter_coeff} | return: {np.mean(rets)} \\pm {np.std(rets)}')
 
     def _reinit_pool(self):
         def get_hidden(state, action, last_action, length):
@@ -982,10 +1023,9 @@ class MAPLE(RLAlgorithm):
                 training_environment.render_rollouts(evaluation_paths)
             if self._epoch % 20 == 0:
                 tester.sync_log_file()
-            # if self._epoch % 100 == 0:
-            #     with self._session.as_default():
-            #     # tester.time_step_holder.set_time()
-            #         tester.save_checkpoint()
+            if self._epoch % 20 == 0 and self._epoch > 900:
+                with self._session.as_default():
+                    tester.save_checkpoint()
             ## ensure we did not collect any more data
             assert self._pool.size == self._init_pool_size
             logger.logkvs(diagnostics)

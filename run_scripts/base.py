@@ -112,7 +112,7 @@ def get_variant_spec_base(universe, domain, task, policy, algorithm, env_params)
                 'domain': domain,
                 'task': task,
                 'universe': universe,
-                'kwargs': (),
+                'kwargs': {},
             },
             'evaluation': lambda spec: (
                 spec['environment_params']['training']),

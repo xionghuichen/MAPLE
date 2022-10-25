@@ -2,7 +2,7 @@ import sys
 sys.path.append("../")
 import os
 from RLA.easy_log.tester import tester
-from run_scripts.utils import get_parser
+from utils import get_parser
 from maple.policy import maple
 from copy import deepcopy
 
@@ -16,9 +16,10 @@ def get_params_from_file(filepath, params_name='params'):
 
 
 def get_variant_spec(command_line_args):
-    from run_scripts.base import get_variant_spec, get_task_spec
+    from base import get_variant_spec, get_task_spec
     params = get_params_from_file(command_line_args.config)
     variant_spec = get_variant_spec(command_line_args, params)
+    print(variant_spec)
     if 'neorl' in command_line_args.config:
         variant_spec['environment_params']['training']['kwargs']['use_neorl'] = True
     else:
@@ -42,24 +43,6 @@ import copy
 import maple.policy.static as static
 
 
-
-def _normalize_trial_resources(resources, cpu, gpu, extra_cpu, extra_gpu):
-    if resources is None:
-        resources = {}
-
-    if cpu is not None:
-        resources['cpu'] = cpu
-
-    if gpu is not None:
-        resources['gpu'] = gpu
-
-    if extra_cpu is not None:
-        resources['extra_cpu'] = extra_cpu
-
-    if extra_gpu is not None:
-        resources['extra_gpu'] = extra_gpu
-    return resources
-
 def get_package_path():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -81,33 +64,36 @@ def main():
     set_seed(variant['run_params']['seed'])
     gpu_options = tf.GPUOptions(allow_growth=True)
     session = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+    tester.set_hyper_param(**variant)
     tf.keras.backend.set_session(session)
 
     # build
-    variant = copy.deepcopy(variant)
 
-    tester.set_hyper_param(**variant)
-    tester.add_record_param(['info',"model_suffix", "penalty_coeff", "length",
-                             'maple_200', 'run_params.seed', 'penalty_clip'])
-    tester.configure(task_name="v2_" + variant["config"], private_config_path=os.path.join(get_package_path(), 'rla_config_mopo.yaml'),
-                     run_file='main.py', log_root=get_package_path())
-    tester.log_files_gen()
-    tester.print_args()
-    if variant['load_task_name'] != '':
-        from RLA.easy_log.tester import ExperimentLoader
+    variant = copy.deepcopy(variant)
+    # redundant code for compatibility to the older version.
+    if variant['elite_num'] <= 0:
+        variant['algorithm_params']['kwargs']['num_networks'] = int(variant['model_suffix'])
+        variant['algorithm_params']['kwargs']['num_elites'] = int(int(variant['model_suffix']) / 7 * 5)
+
+    if variant['loaded_task_name'] != '':
+        from RLA import ExperimentLoader
         el = ExperimentLoader()
-        el.config(task_name=variant['load_task_name'],
-                  record_date=variant['load_date'], root='../',
-                  inherit_hp=~variant['not_inherit_hp'])
-        el.fork_tester_log_files()
-        hp = copy.deepcopy(tester.hyper_param)
-        hp['load_task_name'] = variant['load_task_name']
-        hp['load_date'] = variant['load_date']
-        hp['retrain_model'] = False
-        hp['algorithm_params'].kwargs.model_load_dir = variant['algorithm_params'].kwargs.model_load_dir
-        variant = hp
+        el.config(task_name=variant['loaded_task_name'],
+                  record_date=variant['loaded_date'], root='../')
+        args = el.import_hyper_parameters(hp_to_overwrite=['retrain_model'])
+        tester.hyper_param = vars(args)
+        tester.hyper_param['retrain_model'] = False
+        tester.hyper_param['algorithm_params'].kwargs.model_load_dir = variant['algorithm_params'].kwargs.model_load_dir
+        variant = copy.deepcopy(tester.hyper_param)
     else:
         el = None
+    tester.add_record_param(['info', "model_suffix", "penalty_coeff", "length",
+                             'maple_200', 'run_params.seed', 'penalty_clip'])
+    tester.configure(task_name="v2_" + variant["config"],
+                     rla_config=os.path.join(get_package_path(), 'rla_config_mopo.yaml'),
+                     log_root=get_package_path())
+    tester.log_files_gen()
+    tester.print_args()
     environment_params = variant['environment_params']
     training_environment = (get_environment_from_params(environment_params['training']))
     evaluation_environment = (get_environment_from_params(environment_params['evaluation'](variant))
@@ -124,7 +110,6 @@ def main():
     if variant['elite_num'] <= 0:
         variant['algorithm_params']['kwargs']['num_networks'] = int(variant['model_suffix'])
         variant['algorithm_params']['kwargs']['num_elites'] = int(int(variant['model_suffix']) / 7 * 5)
-
     # construct MAPLE parameters
     algorithm_params = variant['algorithm_params']
     algorithm_kwargs = deepcopy(algorithm_params['kwargs'])
@@ -154,6 +139,7 @@ def main():
         list(trainer.train())
     else:
         trainer.vis(el)
+        trainer.performance_ns(el)
 
 if __name__=='__main__':
     main()
